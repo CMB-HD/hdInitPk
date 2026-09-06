@@ -1,0 +1,55 @@
+# ---------------------------------------------------------------------------
+# Fisher step sizes, CLASS parameter names.
+#
+# Direct translation of the CAMB step-size file. The step sizes and step types
+# are unchanged; only the parameter names differ, because with native CLASS
+# input the varied parameter must match a key in `fiducial_class_params.yaml`.
+#
+#   ombh2  -> omega_b        omch2 -> omega_cdm     theta -> theta_s_100
+#   tau    -> tau_reio       logA  -> ln_A_s_1e10   ns    -> n_s
+#   mnu    -> m_ncdm         H0    -> H0            nrun  -> alpha_s
+#
+# NOTE: a Fisher matrix built with this file is labelled with CLASS parameter
+# names, so `add_fishers` and `get_common_params` will find no parameters in
+# common with a CAMB Fisher matrix. Rename before combining or comparing.
+# ---------------------------------------------------------------------------
+
+omega_b:
+        step_size: 0.01
+        step_type: relative
+
+omega_cdm:
+        step_size: 0.01
+        step_type: relative
+
+tau_reio:
+        step_size: 0.05
+        step_type: relative
+
+ln_A_s_1e10:
+        # a step of ~0.3% in ln(A_s * 1e10) corresponds to 1% in A_s
+        step_size: 0.0033
+        step_type: relative
+
+n_s:
+        step_size: 0.01
+        step_type: relative
+
+# `sum_m_ncdm` is the TOTAL neutrino mass, the same quantity as CAMB's `mnu`,
+# so this is the identical 10% relative step the CAMB file uses. No rescaling
+# is needed when comparing the two Fisher matrices.
+sum_m_ncdm:
+        step_size: 0.10
+        step_type: relative
+
+H0:
+        step_size: 0.01
+        step_type: relative
+
+alpha_s:
+        step_size: 0.01
+        step_type: absolute
+
+Neff:
+        step_size: 0.05
+        step_type: relative

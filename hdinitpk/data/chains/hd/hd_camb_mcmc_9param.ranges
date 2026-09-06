@@ -1,0 +1,17 @@
+                  logA    2.0000000E+00    4.0000000E+00
+                    As                N                N
+                    ns    8.0000000E-01    1.2000000E+00
+                    H0    2.0000000E+01    1.0000000E+02
+                 ombh2    5.0000000E-03    1.0000000E-01
+                 omch2    1.0000000E-03    9.9000000E-01
+                   mnu    0.0000000E+00    5.0000000E+00
+                   nnu    5.0000000E-02    1.0000000E+01
+                   tau                N                N
+                sigma8                N                N
+                  nrun   -2.0000000E-01    2.0000000E-01
+             chi2__BAO                N                N
+         minuslogprior                N                N
+      minuslogprior__0                N                N
+                  chi2                N                N
+chi2__hdlike.hdlike.HDLike                N                N
+     chi2__bao.generic                N                N

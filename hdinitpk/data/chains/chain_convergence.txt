@@ -1,0 +1,8 @@
+# Gelman-Rubin R-1 of each full chain (before thinning)
+pas_lcdm_nrun 0.0044722440734288015
+pas_w0wacdm_nrun 0.0051139237520917945
+pas_lcdm_nrun_nnu 0.0051412875239099124
+pas_lcdm_nrun_nnu_mnu 0.005271862251716054
+pact_lb_nrun 0.004523816692797246
+hd_camb_mcmc_9param 0.009363603415963087
+hd_class_mcmc_9param 0.0110561982892497

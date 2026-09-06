@@ -1,0 +1,120 @@
+# ---------------------------------------------------------------------------
+# Fiducial CLASS parameters.
+#
+# Native CLASS input: every key is passed straight to `classy.Class.set()`.
+# There is no translation from CAMB parameter names.
+#
+# Values reproduce what the old `set_class_params` translation produced from
+# the CAMB `fiducial_params.yaml`, EXCEPT for the neutrino setup (see below).
+#
+# Handling applied in `theory.set_class_params`:
+#   * `l_max_scalars`  - theory saved to this multipole; CLASS asked for +500.
+#   * `Neff`           - if given instead of `N_ur`, derives
+#                        N_ur = Neff - (N_ncdm * deg_ncdm) * 1.0131966
+#   * `H0`/`theta_s_100` - one is dropped according to `use_H0`.
+#   * any key set to `null` is dropped, so CLASS uses its own default.
+#
+# DO NOT write `key: null` in this file. `Fisher.save_param_steps_values`
+# calls float() on every fiducial value and raises TypeError on None. Comment
+# the key out instead, or apply the None guard described in the change notes.
+# ---------------------------------------------------------------------------
+
+
+# ----- cosmological parameters -----
+# From Planck 2018 TT,TE,EE + lowl + lowE + lensing, matching the CAMB file.
+omega_b: 0.02237          # was ombh2
+omega_cdm: 0.1200         # was omch2
+theta_s_100: 1.04071      # was theta
+tau_reio: 0.0544          # was tau
+n_s: 0.9649               # was ns
+alpha_s: 0.0              # was nrun
+
+ln_A_s_1e10: 3.044
+# A_s: 2.0989031673191437e-09   # alternative to ln_A_s_1e10; see note above
+
+# Only used when `use_H0=True`; otherwise dropped in favour of theta_s_100.
+H0: 67.36
+
+
+# ----- neutrinos -----
+#
+# `sum_m_ncdm` is a convenience key handled by `theory.set_class_params`, not a
+# CLASS parameter. It holds the SUM of the neutrino masses; the sum is split
+# evenly over the massive species and written into `m_ncdm` before CLASS sees
+# it, then removed.
+#
+# This exists because CLASS wants `m_ncdm` as a comma-separated per-species
+# string, which the Fisher machinery cannot step (it does float arithmetic on
+# the fiducial value). Varying the sum reproduces the old `mnu` behaviour
+# exactly: sum_m_ncdm: 0.06 with N_ncdm: 3 builds '0.02,0.02,0.02', the same
+# string the old CAMB-to-CLASS translation produced from mnu: 0.06.
+#
+# Give `sum_m_ncdm` OR `m_ncdm`, never both. Write `m_ncdm` directly only if
+# you do not need to vary the mass.
+N_ncdm: 3
+sum_m_ncdm: 0.06
+# m_ncdm: '0.02, 0.02, 0.02'   # CLASS-native form; cannot be varied
+
+Neff: 3.044
+
+
+
+# ----- maximum multipole -----
+l_max_scalars: 24000
+
+
+# ----- non-linear model -----
+hmcode_version: 2016
+
+
+
+# ----- output and physics settings -----
+output: 'lCl ,tCl ,pCl ,mPk'
+modes: 's'
+lensing: 'yes'
+non_linear: 'hmcode'
+recombination: 'recfast'
+YHe: 'BBN'
+T_cmb: 2.7255
+
+# CLASS opens this file itself, so it needs an ABSOLUTE path and cannot be
+# given one resolved through `hdinitpk.data_path`. The table ships with the
+# package, at
+#     <this repository>/hdinitpk/data/class_inputs/PRIMAT21_class_format.dat
+# `run_hdInitPk_forecasts.py` and `run_hdInitPk_forecasts.ipynb`
+# rewrite the `/path/to/hdInitPk` placeholder below to the installed package
+# and pass CLASS the rewritten copy, so there is nothing to edit for those.
+# Anything else that reads this file directly must substitute it, or CLASS
+# aborts with "could not open fA with name /path/to/hdInitPk/...".
+# (It was `/gpfs/home/zcheslog/cmb_hd/PRIMAT21_class_format.dat` on SeaWulf.)
+sBBN file: '/path/to/hdInitPk/hdinitpk/data/class_inputs/PRIMAT21_class_format.dat'
+
+
+# ----- accuracy settings -----
+delta_l_max: 2050
+P_k_max_h/Mpc: 500.0
+l_logstep: 1.025
+l_linstep: 20
+perturbations_sampling_stepsize: 0.05
+l_switch_limber: 30.0
+hyper_sampling_flat: 32.0
+l_max_g: 40
+l_max_ur: 35
+l_max_pol_g: 60
+ur_fluid_approximation: 2
+ur_fluid_trigger_tau_over_tau_k: 130.0
+radiation_streaming_approximation: 2
+radiation_streaming_trigger_tau_over_tau_k: 240.0
+hyper_flat_approximation_nu: 7000.0
+transfer_neglect_delta_k_S_t0: 0.17
+transfer_neglect_delta_k_S_t1: 0.05
+transfer_neglect_delta_k_S_t2: 0.17
+transfer_neglect_delta_k_S_e: 0.17
+accurate_lensing: 1
+start_small_k_at_tau_c_over_tau_h: 0.0004
+start_large_k_at_tau_h_over_tau_k: 0.05
+tight_coupling_trigger_tau_c_over_tau_h: 0.005
+tight_coupling_trigger_tau_c_over_tau_k: 0.008
+start_sources_at_tau_c_over_tau_h: 0.006
+l_max_ncdm: 30
+tol_ncdm_synchronous: 1.0e-6

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hdinitpk"
+version = "0.1.0"
+description = "Binned primordial power spectrum forecasts for CMB-HD, SO, and CMB-PAS (Cheslog et al. 2026)"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pyyaml",
+    "camb",
+    # The following are installed from their GitHub repositories
+    "hdfisher",       # requires the version with the subclass seams (_compute_spectra etc.)
+    "hd_mock_data",   
+    "hd_pk",          # required for the binned-Pk calculation (cmb_from_pk)
+]
+
+[project.optional-dependencies]
+mcmc = ["hdlike"]
+# needed only for hdinitpk.plotting_utilities (figures and tables):
+plots = ["matplotlib", "pandas", "getdist"]
+
+[tool.setuptools]
+packages = ["hdinitpk"]
+
+# The data products and the cobaya input files live inside the package
+# directory; without this they would be left out of both the wheel and the
+# sdist, and `hdinitpk.data_path` would point at an empty directory.
+[tool.setuptools.package-data]
+hdinitpk = [
+    "data/**",
+    "cobaya_yaml_files/**",
+]

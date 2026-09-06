@@ -1,0 +1,79 @@
+# ---------------------------------------------------------------------------
+# Step sizes for the w0waCDM + alpha_s CLASS forecast.
+#
+# `class_fiducial_step_sizes.yaml` with the two dark-energy parameters added.
+# The names are CLASS's own, matching class_w0wa_fiducial_params.yaml:
+#
+#     ombh2 -> omega_b        nnu  -> Neff         w  -> w0_fld
+#     omch2 -> omega_cdm      mnu  -> sum_m_ncdm   wa -> wa_fld
+#     tau   -> tau_reio       nrun -> alpha_s
+#     logA  -> ln_A_s_1e10    ns   -> n_s
+#
+# `theta_s_100` is deliberately absent, as it is from the file this was
+# built from: with `use_H0=True` it is dropped in favour of `H0` anyway.
+# Its fiducial value still lives in the parameter file.
+#
+# Every step size and step type matches camb_w0wa_fiducial_step_sizes.yaml
+# exactly; only the names differ. The CAMB and CLASS w0wa forecasts
+# therefore step each parameter, w and wa included, by the same amount.
+#
+# `sum_m_ncdm` is the TOTAL neutrino mass, the same quantity as CAMB's
+# `mnu`, so its 10% relative step needs no rescaling when the two Fisher
+# matrices are compared.
+#
+# NOTE: a Fisher matrix built with this file is labelled with CLASS
+# parameter names, so `add_fishers` and `get_common_params` will find
+# nothing in common with a CAMB Fisher matrix. Rename before combining or
+# comparing; `to_class` in run_hdInitPk_forecasts.py does that.
+# ---------------------------------------------------------------------------
+
+omega_b:
+        step_size: 0.01
+        step_type: relative
+
+omega_cdm:
+        step_size: 0.01
+        step_type: relative
+
+tau_reio:
+        step_size: 0.05
+        step_type: relative
+
+ln_A_s_1e10:
+        # a step of ~0.3% in ln(A_s * 1e10) corresponds to 1% in A_s
+        step_size: 0.0033
+        step_type: relative
+
+n_s:
+        step_size: 0.01
+        step_type: relative
+
+# `sum_m_ncdm` is the TOTAL neutrino mass, the same quantity as CAMB's `mnu`,
+# so this is the identical 10% relative step the CAMB file uses. No rescaling
+# is needed when comparing the two Fisher matrices.
+sum_m_ncdm:
+        step_size: 0.10
+        step_type: relative
+
+H0:
+        step_size: 0.01
+        step_type: relative
+
+alpha_s:
+        step_size: 0.01
+        step_type: absolute
+
+Neff:
+        step_size: 0.05
+        step_type: relative
+
+# ----- dark energy -----
+# w(a) = w0_fld + wa_fld * (1 - a).
+w0_fld:
+        step_size: 0.01
+        step_type: relative
+wa_fld:
+        # absolute, because the fiducial wa_fld is 0 and a relative step of
+        # it would be no step at all.
+        step_size: 0.01
+        step_type: absolute

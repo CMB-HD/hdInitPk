@@ -1,0 +1,41 @@
+           eneg2tauPk1    0.0000000E+00    1.5000000E-08
+           eneg2tauPk2    5.0000000E-10    8.0000000E-09
+           eneg2tauPk3    1.4000000E-09    2.4000000E-09
+           eneg2tauPk4    1.6842442E-09    2.1426082E-09
+           eneg2tauPk5    1.7000000E-09    2.0000000E-09
+           eneg2tauPk6    1.0447957E-09    2.5520557E-09
+           eneg2tauPk7    0.0000000E+00    8.4629561E-09
+                    k1    1.8619358E-03    1.8619358E-03
+                    k2    6.0867684E-03    6.0867684E-03
+                    k3    1.4116291E-02    1.4116291E-02
+                    k4    3.2738172E-02    3.2738172E-02
+                    k5    7.5925604E-02    7.5925604E-02
+                    k6    1.7608489E-01    1.7608489E-01
+                    k7    4.0837195E-01    4.0837195E-01
+                nkbins    7.0000000E+00    7.0000000E+00
+                 ombh2    1.7000000E-02    2.7000000E-02
+                 omch2    9.0000000E-02    1.5000000E-01
+         cosmomc_theta    1.0380000E-02    1.0440000E-02
+                   tau                N                N
+                    H0                N                N
+             thetastar                N                N
+                sigma8                N                N
+                   YHe                N                N
+                  zrei                N                N
+                 zstar                N                N
+                 rstar                N                N
+                 zdrag                N                N
+                 rdrag                N                N
+                 A_act                N                N
+                 P_act    5.0000000E-01    1.5000000E+00
+              A_planck                N                N
+             chi2__BAO                N                N
+             chi2__CMB                N                N
+         minuslogprior                N                N
+      minuslogprior__0                N                N
+                  chi2                N                N
+chi2__act_dr6_cmbonly.ACTDR6CMBonly                N                N
+chi2__act_dr6_cmbonly.PlanckActCut                N                N
+chi2__planck_2018_lowl.TT                N                N
+chi2__bao.desi_2024_bao_all                N                N
+chi2__act_dr6_lenslike.ACTDR6LensLike                N                N

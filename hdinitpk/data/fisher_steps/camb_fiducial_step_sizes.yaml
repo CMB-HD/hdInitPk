@@ -1,0 +1,31 @@
+ombh2:
+        step_size: 0.01
+        step_type: relative
+omch2: 
+        step_size: 0.01
+        step_type: relative
+theta: 
+        step_size: 0.01
+        step_type: relative
+tau: 
+        step_size: 0.05
+        step_type: relative
+logA: 
+        # step in ~ 0.3% in logA corresponds to 1% in As
+        step_size: 0.0033
+        step_type: relative
+ns: 
+        step_size: 0.01
+        step_type: relative
+nnu: 
+        step_size: 0.05
+        step_type: relative
+mnu: 
+        step_size: 0.10
+        step_type: relative
+H0: 
+        step_size: 0.01
+        step_type: relative
+nrun: 
+        step_size: 0.01
+        step_type: absolute

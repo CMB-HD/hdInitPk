@@ -1,0 +1,68 @@
+ombh2	\Omega_\mathrm{b} h^2
+omch2	\Omega_\mathrm{c} h^2
+cosmomc_theta	\theta_\mathrm{MC}
+logA	\log(10^{10} A_\mathrm{s})
+ns	n_\mathrm{s}
+tau	\tau_\mathrm{reio}
+Ecal	E_{\rm cal}
+Tcal	T_{\rm cal}
+calib_100T	c_{100}
+calib_217T	c_{217}
+A_cib_217	A_cib_217
+xi_sz_cib	xi_sz_cib
+A_sz	A_sz
+ksz_norm	ksz_norm
+gal545_A_100	A^\mathrm{dustTT}_{100}
+gal545_A_143	A^\mathrm{dustTT}_{143}
+gal545_A_143_217	A^\mathrm{dustTT}_{\mathrm{143}\times\mathrm{217}}
+gal545_A_217	A^\mathrm{dustTT}_{217}
+ps_A_100_100	ps_A_100_100
+ps_A_143_143	ps_A_143_143
+ps_A_143_217	ps_A_143_217
+ps_A_217_217	ps_A_217_217
+galf_TE_A_100	A^\mathrm{dustTE}_{100}
+galf_TE_A_100_143	A^\mathrm{dustTE}_{\mathrm{100}\times\mathrm{143}}
+galf_TE_A_100_217	A^\mathrm{dustTE}_{\mathrm{100}\times\mathrm{217}}
+galf_TE_A_143	A^\mathrm{dustTE}_{143}
+galf_TE_A_143_217	A^\mathrm{dustTE}_{\mathrm{143}\times\mathrm{217}}
+galf_TE_A_217	A^\mathrm{dustTE}_{217}
+A_act	A_{\rm ACT}
+P_act	p_{\rm ACT}
+nrun	{\rm d} n_s / {\rm d} \ln k
+nnu	N_\mathrm{eff}
+mnu	\sum m_\nu~ \mathrm{[eV]}
+H0*	H_0
+omegamh2*	\Omega_\mathrm{m} h^2
+A*	10^9 A_\mathrm{s}
+As*	A_\mathrm{s}
+omega_de*	\Omega_\Lambda
+omegam*	\Omega_\mathrm{m}
+YHe*	Y_\mathrm{P}
+age*	{\rm{Age}}/\mathrm{Gyr}
+clamp*	10^9 A_\mathrm{s} e^{-2\tau}
+rdrag*	r_\mathrm{drag}
+s8h5*	\sigma_8/h^{0.5}
+s8omegamp25*	\sigma_8 \Omega_\mathrm{m}^{0.25}
+s8omegamp5*	\sigma_8 \Omega_\mathrm{m}^{0.5}
+sigma8*	\sigma_8
+S_8*	$S_8$
+A_planck*	A_{\mathrm{Planck}}
+thetastar*	\theta_\star
+zrei*	z_\mathrm{reio}
+taurend*	\tau_\mathrm{rec}
+zstar*	z_\star
+rstar*	r_{s,\star}
+zdrag*	z_d
+chi2__BAO*	\chi^2_\mathrm{BAO}
+minuslogprior*	-\log\pi
+minuslogprior__0*	-\log\pi_\mathrm{0}
+minuslogprior__cal_dip_prior*	-\log\pi_\mathrm{cal\ dip\ prior}
+chi2*	\chi^2
+chi2__candl_like*	\chi^2_\mathrm{candl\ like}
+chi2__clipy_highl_tt*	\chi^2_\mathrm{clipy\ highl\ tt}
+chi2__clipy_highl_te*	\chi^2_\mathrm{clipy\ highl\ te}
+chi2__clipy_highl_ee*	\chi^2_\mathrm{clipy\ highl\ ee}
+chi2__clipy_lowl_tt*	\chi^2_\mathrm{clipy\ lowl\ tt}
+chi2__act_dr6_cmbonly.ACTDR6CMBonly*	\chi^2_\mathrm{act\ dr6\ cmbonly.ACTDR6CMBonly}
+chi2__act_dr6_spt_lenslike.ACTDR6LensLike*	\chi^2_\mathrm{act\ dr6\ spt\ lenslike.ACTDR6LensLike}
+chi2__bao.desi_dr2.desi_bao_all*	\chi^2_\mathrm{bao.desi\ dr2.desi\ bao\ all}

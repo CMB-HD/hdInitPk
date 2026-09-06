@@ -1,0 +1,78 @@
+eneg2tauPk1	e^{-2\tau}P_{1}(k)
+eneg2tauPk10	e^{-2\tau}P_{10}(k)
+eneg2tauPk11	e^{-2\tau}P_{11}(k)
+eneg2tauPk12	e^{-2\tau}P_{12}(k)
+eneg2tauPk13	e^{-2\tau}P_{13}(k)
+eneg2tauPk14	e^{-2\tau}P_{14}(k)
+eneg2tauPk15	e^{-2\tau}P_{15}(k)
+eneg2tauPk16	e^{-2\tau}P_{16}(k)
+eneg2tauPk17	e^{-2\tau}P_{17}(k)
+eneg2tauPk18	e^{-2\tau}P_{18}(k)
+eneg2tauPk19	e^{-2\tau}P_{19}(k)
+eneg2tauPk2	e^{-2\tau}P_{2}(k)
+eneg2tauPk20	e^{-2\tau}P_{20}(k)
+eneg2tauPk21	e^{-2\tau}P_{21}(k)
+eneg2tauPk22	e^{-2\tau}P_{22}(k)
+eneg2tauPk23	e^{-2\tau}P_{23}(k)
+eneg2tauPk24	e^{-2\tau}P_{24}(k)
+eneg2tauPk25	e^{-2\tau}P_{25}(k)
+eneg2tauPk26	e^{-2\tau}P_{26}(k)
+eneg2tauPk27	e^{-2\tau}P_{27}(k)
+eneg2tauPk28	e^{-2\tau}P_{28}(k)
+eneg2tauPk29	e^{-2\tau}P_{29}(k)
+eneg2tauPk3	e^{-2\tau}P_{3}(k)
+eneg2tauPk30	e^{-2\tau}P_{30}(k)
+eneg2tauPk4	e^{-2\tau}P_{4}(k)
+eneg2tauPk5	e^{-2\tau}P_{5}(k)
+eneg2tauPk6	e^{-2\tau}P_{6}(k)
+eneg2tauPk7	e^{-2\tau}P_{7}(k)
+eneg2tauPk8	e^{-2\tau}P_{8}(k)
+eneg2tauPk9	e^{-2\tau}P_{9}(k)
+ombh2	\Omega_\mathrm{b}h^2
+omch2	\Omega_\mathrm{c}h^2
+cosmomc_theta	\theta_\mathrm{MC}
+tau	\tau_\mathrm{reio}
+A_act	A_{\rm ACT}
+P_act	p_{\rm ACT}
+Ecal	E_{\rm cal}
+Tcal	T_{\rm cal}
+calib_100T	c_{100}
+calib_217T	c_{217}
+A_cib_217	A_cib_217
+xi_sz_cib	xi_sz_cib
+A_sz	A_sz
+ksz_norm	ksz_norm
+gal545_A_100	A^\mathrm{dustTT}_{100}
+gal545_A_143	A^\mathrm{dustTT}_{143}
+gal545_A_143_217	A^\mathrm{dustTT}_{\mathrm{143}\times\mathrm{217}}
+gal545_A_217	A^\mathrm{dustTT}_{217}
+ps_A_100_100	ps_A_100_100
+ps_A_143_143	ps_A_143_143
+ps_A_143_217	ps_A_143_217
+ps_A_217_217	ps_A_217_217
+galf_TE_A_100	A^\mathrm{dustTE}_{100}
+galf_TE_A_100_143	A^\mathrm{dustTE}_{\mathrm{100}\times\mathrm{143}}
+galf_TE_A_100_217	A^\mathrm{dustTE}_{\mathrm{100}\times\mathrm{217}}
+galf_TE_A_143	A^\mathrm{dustTE}_{143}
+galf_TE_A_143_217	A^\mathrm{dustTE}_{\mathrm{143}\times\mathrm{217}}
+galf_TE_A_217	A^\mathrm{dustTE}_{217}
+H0*	H_0
+thetastar*	\theta_\star
+sigma8*	\sigma_8
+YHe*	Y_\mathrm{He}
+zrei*	z_\mathrm{reio}
+zstar*	z_\star
+rstar*	r_{s,\star}
+zdrag*	z_d
+rdrag*	r_d
+A_planck*	A_{\rm planck}
+minuslogprior*	-\log\pi
+minuslogprior__0*	-\log\pi_\mathrm{0}
+chi2*	\chi^2
+chi2__candl_like*	\chi^2_\mathrm{candl\ like}
+chi2__clipy_highl_tt*	\chi^2_\mathrm{clipy\ highl\ tt}
+chi2__clipy_highl_te*	\chi^2_\mathrm{clipy\ highl\ te}
+chi2__clipy_highl_ee*	\chi^2_\mathrm{clipy\ highl\ ee}
+chi2__clipy_lowl_tt*	\chi^2_\mathrm{clipy\ lowl\ tt}
+chi2__act_dr6_cmbonly.ACTDR6CMBonly*	\chi^2_\mathrm{act\ dr6\ cmbonly.ACTDR6CMBonly}
+chi2__act_dr6_spt_lenslike.ACTDR6LensLike*	\chi^2_\mathrm{act\ dr6\ spt\ lenslike.ACTDR6LensLike}

@@ -1,0 +1,16 @@
+ln_A_s_1e10	\log(10^{10} A_\mathrm{s})
+n_s	n_\mathrm{s}
+H0	H_0
+omega_b	\Omega_\mathrm{b} h^2
+omega_cdm	\Omega_\mathrm{c} h^2
+mnu	\sum m_\nu
+N_eff	N_\mathrm{eff}
+tau_reio	\tau_\mathrm{reio}
+alpha_s	\alpha_s
+A_s*	A_\mathrm{s}
+chi2__BAO*	\chi^2_\mathrm{BAO}
+minuslogprior*	-\log\pi
+minuslogprior__0*	-\log\pi_\mathrm{0}
+chi2*	\chi^2
+chi2__hdlike.hdlike.HDLike*	\chi^2_\mathrm{hdlike.hdlike.HDLike}
+chi2__bao.generic*	\chi^2_\mathrm{bao.generic}

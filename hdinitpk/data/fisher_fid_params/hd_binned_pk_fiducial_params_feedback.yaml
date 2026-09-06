@@ -1,0 +1,63 @@
+# cosmological parameters from Planck 2018 TT,TE,EE + low l + low E + lensing
+ombh2: 0.02237
+omch2: 0.1200
+tau: 0.0544
+H0: 67.36
+nnu: 3.044
+mnu: 0.06
+num_massive_neutrinos: 3
+effective_ns_for_nonlinear: 0.9649
+ns: 0.9649
+logA: 3.044
+
+#ksz
+A_ksz: 1.0
+n_ksz: 0.0
+
+#tagn
+halofit_version: 'mead2020_feedback'
+HMCode_logT_AGN: 7.8
+
+# accuracy parameters:
+NonLinear: NonLinear_both
+AccuracyBoost: 1.1
+kmax: 100
+k_per_logint: 130
+min_l_logl_sampling: 10000
+lAccuracyBoost: 3.0
+lSampleBoost: 3.0
+DoLateRadTruncation: False
+lens_margin: 2050
+lens_potential_accuracy: 30
+bbn_predictor: 'PRIMAT_Yp_DH_ErrorMC_2021.dat'
+recombination_model: 'Recfast' 
+lmax: 24000
+
+# ks:
+k1: 6.086768361185573850e-03
+k2: 1.411629094913085906e-02 
+k3: 3.273817210315199677e-02 
+k4: 7.592560372394346890e-02 
+k5: 1.760848859454276494e-01
+k6: 4.083719527756143330e-01
+k7: 9.470866901401941984e-01 
+k8: 2.196461320480454837e+00
+k9: 5.093981768081436989e+00
+k10: 1.181384348160070630e+01 
+k11: 2.739838973949153456e+01 
+nkbins: 11
+
+#k bins
+Pk1: 2.2599262894691584e-09
+Pk2: 2.194173961697125e-09
+Pk3: 2.1303346912790355e-09
+Pk4: 2.0683528180038605e-09
+Pk5: 2.0081743010888044e-09
+Pk6: 1.949746672062204e-09
+Pk7: 1.893018989017294e-09
+Pk8: 1.837941792196956e-09
+Pk9: 1.7844670608707235e-09
+Pk10: 1.7325481714664455e-09
+Pk11: 1.682139856920108e-09
+
+

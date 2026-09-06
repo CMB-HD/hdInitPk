@@ -1,0 +1,45 @@
+ombh2:
+        step_size: 0.01
+        step_type: relative
+omch2: 
+        step_size: 0.01
+        step_type: relative
+tau: 
+        step_size: 0.05
+        step_type: relative
+H0: 
+        step_size: 0.01
+        step_type: relative
+Pk1:
+  step_size: 0.05
+  step_type: relative
+Pk2:
+  step_size: 0.05
+  step_type: relative
+Pk3:
+  step_size: 0.05
+  step_type: relative
+Pk4:
+  step_size: 0.05
+  step_type: relative
+Pk5:
+  step_size: 0.05
+  step_type: relative
+Pk6:
+  step_size: 0.05
+  step_type: relative
+Pk7:
+  step_size: 0.05
+  step_type: relative
+Pk8:
+  step_size: 0.05
+  step_type: relative
+Pk9:
+  step_size: 0.05
+  step_type: relative
+Pk10:
+  step_size: 0.05
+  step_type: relative
+Pk11:
+  step_size: 0.05
+  step_type: relative
