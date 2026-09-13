@@ -117,6 +117,7 @@ python run_hdInitPk_verify_accuracy_settings.py
 
 The script reads the `camb_9param` and `class_9param` derivatives from `hdinitpk/data/user_generated_data/fisher_derivs`, which is where `run_hdInitPk_forecasts.py` and `run_hdInitPk_forecasts.ipynb` write them. If they are not there it calculates them itself, which is slow. It computes
 
+
 $$b_i = (F^{-1})_{ij} \ \partial_j C^T \ \mathrm{Cov}^{-1} \ (C^\mathrm{true} - C^\mathrm{fid})$$
 
 at each accuracy setting, divides it by the forecasted error on each parameter, prints the result, and draws Figure 8. Everything else it needs (the accuracy-grid spectra, the high-accuracy reference spectra, and the eight-parameter Fisher matrices) ships with the package. Figure 7, which compares the CAMB and CLASS spectra at the settings adopted for the paper, stays in the plotting notebook and needs nothing external.
@@ -230,7 +231,7 @@ $$P_\mathrm{lin}(k, z=0) = 2 \pi^2 \ k \ T(k)^2 \ \mathcal{P}(k)$$
 
 with one CAMB call per cosmology returning the $z = 0$ matter transfer function $T(k)$, and $\mathcal{P}(k)$ the sampled primordial power in each bin. The script runs in two modes, either or both of which can be enabled.
 
-- Fisher mode draws Gaussian samples from the CMB-HD and SO-like binned-$\mathcal{P}(k)$ Fisher forecasts and computes $P_\mathrm{lin}$ for each. It needs the Fisher derivative directories, set at the top of the file as `HD_FISHER_DERIV_DIR` and `SO_FISHER_DERIV_DIR`.
+- Fisher mode draws Gaussian samples from the CMB-HD and SO-like binned-$\mathcal{P}(k)$ Fisher forecasts and computes $P_\mathrm{lin}$ for each. It needs the binned-$\mathcal{P}(k)$ Fisher derivative directories, which `HD_FISHER_DERIV_DIR` and `SO_FISHER_DERIV_DIR` at the top of the file point at. They default to the `hd_binned_pk_feedback` and `so_binned_pk` directories that `run_hdInitPk_forecasts.py` writes, so running that first leaves nothing to fill in.
 - Chain mode computes $P_\mathrm{lin}$ for every post-burn-in sample of a binned-$\mathcal{P}(k)$ MCMC chain.
 
 Both modes use the same transfer-function method, but each keeps the CAMB accuracy settings of the calculation it came from.
