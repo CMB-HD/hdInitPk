@@ -51,14 +51,25 @@ import hdinitpk
 from hdinitpk import hdinitPkfisher
 
 
+# The directory this script lives in, so that the paths below are relative
+# to the script rather than to wherever it is run from.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def script_relative(*parts):
+    """A path below this script's own directory."""
+    return os.path.join(SCRIPT_DIR, *parts)
+
+
 # ======================================================================
-# SET THESE: the Fisher derivative directories.
+# The Fisher derivative directories.
 # ======================================================================
 # Fisher mode needs the binned-P(k) Fisher DERIVATIVES for CMB-HD and for
 # SO-like. Those are far too large to distribute, so they are not included
-# with this package. You generate them yourself and point the two
-# variables below at the result. `example_calc_binnedPk_forecasts.py` in the
-# repository root shows how to produce them:
+# with this package. The defaults below are where run_hdInitPk_forecasts.py
+# and run_hdInitPk_forecasts.ipynb write them, from the `binned_pk_hd_feedback`
+# and `binned_pk_so` configurations. example_calc_binnedPk_forecasts.py writes
+# the SO one too, and shows how the calculation works:
 #
 #     fisherlib = hdinitpk.hdinitPkfisher.Fisher(<output dir>, overwrite=True,
 #                                        binned_pk=True, bin_edges=...,
@@ -73,9 +84,15 @@ from hdinitpk import hdinitPkfisher
 # `hd_data_version`, and the step-size and parameter files) MUST match the
 # ones used when the derivatives were calculated.
 #
-# FILL THESE IN with the paths to your own derivative directories.
-HD_FISHER_DERIV_DIR = '/path/to/derivs/amanda_binned_pk_11_bins_5_percent_feedback'
-SO_FISHER_DERIV_DIR = '/path/to/derivs/binned_pk_so_fisher_output'
+# These resolve inside the repository, which is what you want when running
+# from a clone. If hdinitpk is installed somewhere else, or you have set
+# HDINITPK_USER_DATA, the derivatives are under
+# hdinitpk.user_data_path('fisher_derivs') instead, so use that here.
+DERIV_DIR = script_relative('hdinitpk', 'data', 'user_generated_data',
+                            'fisher_derivs')
+
+HD_FISHER_DERIV_DIR = os.path.join(DERIV_DIR, 'hd_binned_pk_feedback')
+SO_FISHER_DERIV_DIR = os.path.join(DERIV_DIR, 'so_binned_pk')
 
 
 # ----------------------------------------------------------------------
@@ -89,18 +106,19 @@ fisher_steps_path = hdinitpk.data_path('fisher_steps')
 fisher_params_path = hdinitpk.data_path('fisher_fid_params')
 binning_path = hdinitpk.data_path('binning')
 
-# Output directories. The combined per-bin summaries written here are what
-# the `<data>/fig6/fig6_points_*.txt` files distributed with the package
-# were made from. Set OVERWRITE = False to skip any experiment/chain whose
-# combined samples file already exists.
+# Output directories, all under `hdinitpk/data/user_generated_data`. Set
+# OVERWRITE = False to skip any experiment or chain whose combined samples
+# file already exists.
 #
-# Chain-mode output goes into the packaged data directory. Fisher mode
-# writes one shard per MPI rank plus a 50000-sample array per experiment,
-# which is bulkier scratch, so it gets its own path for you to FILL IN;
-# point `out_dir_fisher` at `hdinitpk.data_path('plin_z0_from_fisher')`
-# instead if you would rather keep the two together.
+# The two `plin_z0` directories hold the per-rank shards and the combined
+# sample arrays, which are bulky. `out_dir_fig6` holds the small per-bin
+# summaries that the plotting notebook reads, in the same five-column
+# format and under the same names as the `fig6_points_*.txt` files
+# distributed with the package, so that setting `fig6_source = 'custom'`
+# there picks them up with no other change.
 out_dir_fisher = hdinitpk.user_data_path('plin_z0', 'from_fisher')
-out_dir_chains = hdinitpk.data_path('plin_z0_from_chains')
+out_dir_chains = hdinitpk.user_data_path('plin_z0', 'from_chains')
+out_dir_fig6 = hdinitpk.user_data_path('fig6')
 
 RUN_FISHER_MODE = True
 RUN_CHAIN_MODE = True
@@ -153,9 +171,14 @@ CUSTOM_CHAIN_NAMES = {
     'pact_lb_30bin':  'p_act_lb_30_bins_arbitrary_binning',
 }
 
-# CHAIN_SOURCE = 'raw': the cobaya `output:` root of your own run, e.g.
-# '/path/to/chains/pk_chains/pas/tau_prior_cmb_pas_7_bins'.
-RAW_CHAIN_ROOT = '/path/to/chains/pk_chains/pas/tau_prior_cmb_pas_7_bins'
+# CHAIN_SOURCE = 'raw': the cobaya `output:` root of your own run.
+# Unlike 'custom', this takes the root itself rather than a name to look
+# up, so it reaches a chain written anywhere. An absolute path works. The
+# default is relative to this script, and points where 'custom' would for
+# the 7-bin CMB-PAS run.
+RAW_CHAIN_ROOT = script_relative(
+    'hdinitpk', 'data', 'user_generated_data', 'chains',
+    'cmb_pas_7_bins_arbitrary_binning')
 
 if CHAIN_SOURCE == 'packaged':
     chain_root = hdinitpk.data_path('chains', 'binned_pk', CHAIN_NAME)
@@ -962,6 +985,95 @@ def run_chain_mode():
 
 
 # ----------------------------------------------------------------------
+# The Figure 6 points.
+# ----------------------------------------------------------------------
+# Both modes write a `plin_z0_errors_*.txt` of their own, in the format
+# each calculation naturally produces. The plotting notebook wants one
+# five-column file per experiment (k bin center, central value, symmetric
+# 1 sigma, lower 68% error, upper 68% error), which is what these build.
+
+def _weighted_quantile(values, weights, q):
+    """The `q`-quantile of `values` under `weights`."""
+    order = np.argsort(values)
+    v, w = values[order], weights[order]
+    cumulative = np.cumsum(w) - 0.5 * w
+    cumulative /= np.sum(w)
+    return np.interp(q, cumulative, v)
+
+
+def _write_fig6_points(name, k, pk, sigma, lower, upper):
+    os.makedirs(out_dir_fig6, exist_ok=True)
+    path = os.path.join(out_dir_fig6, f'fig6_points_{name}.txt')
+    np.savetxt(
+        path, np.column_stack([k, pk, sigma, lower, upper]),
+        header=('columns: k bin center [Mpc^-1]   P_lin(k, z=0) [Mpc^3]   '
+                'sigma   lower_err   upper_err\n'
+                'raw values: no x-offsets and no snapping to the theory '
+                'grid (the notebook applies those)'))
+    print(f'[rank 0] wrote {path}', flush=True)
+
+
+def write_fig6_points():
+    """Write `fig6_points_<hd|so|pas>.txt` from whichever modes have run.
+
+    The CMB-HD and SO-like points come from fisher mode, whose error file
+    already holds every column needed. The CMB-PAS points come from chain
+    mode, where the samples carry importance weights, so the mean and the
+    68% interval are recomputed here from the saved samples rather than
+    read from its error file, which only records a symmetric width.
+    """
+    if RUN_FISHER_MODE:
+        for name in ('hd', 'so'):
+            path = os.path.join(
+                out_dir_fisher,
+                f'plin_z0_errors_{EXPERIMENTS[name]["tag"]}.txt')
+            if not os.path.isfile(path):
+                print(f'[rank 0] no {path}, skipping fig6_points_{name}.txt',
+                      flush=True)
+                continue
+            k, mean, sigma, _frac, lower, upper, _pk_frac = np.loadtxt(
+                path, unpack=True)
+            _write_fig6_points(name, k, mean, sigma, lower, upper)
+
+    if RUN_CHAIN_MODE:
+        run_label = os.path.basename(chain_root)
+        sample_files = sorted(glob.glob(os.path.join(
+            out_dir_chains, f'plin_z0_samples_{run_label}*.npy')))
+        if not sample_files:
+            print(f'[rank 0] no plin samples for {run_label} in '
+                  f'{out_dir_chains}, skipping fig6_points_pas.txt',
+                  flush=True)
+            return
+        samples, weights, k_centers = [], [], None
+        for sample_file in sample_files:
+            tag = os.path.basename(sample_file)[len('plin_z0_samples_'):-4]
+            s = np.load(sample_file)
+            w = np.load(os.path.join(out_dir_chains, f'weights_{tag}.npy'))
+            k = np.load(os.path.join(out_dir_chains, f'k_centers_{tag}.npy'))
+            if k_centers is None:
+                k_centers = k
+            elif not np.allclose(k, k_centers):
+                raise ValueError('the k bin centers differ between the '
+                                 f'chains of {run_label}.')
+            samples.append(s)
+            weights.append(w)
+        samples = np.concatenate(samples, axis=0)
+        weights = np.concatenate(weights, axis=0)
+
+        mean, sigma, lower, upper = [], [], [], []
+        for j in range(len(k_centers)):
+            column = samples[:, j]
+            m = np.average(column, weights=weights)
+            p16 = _weighted_quantile(column, weights, 0.16)
+            p84 = _weighted_quantile(column, weights, 0.84)
+            mean.append(m)
+            lower.append(m - p16)
+            upper.append(p84 - m)
+            sigma.append(0.5 * ((m - p16) + (p84 - m)))
+        _write_fig6_points('pas', k_centers, mean, sigma, lower, upper)
+
+
+# ----------------------------------------------------------------------
 # Main.
 # ----------------------------------------------------------------------
 if __name__ == '__main__':
@@ -1011,4 +1123,5 @@ if __name__ == '__main__':
         mpi.comm.barrier()
 
     if mpi.rank == 0:
+        write_fig6_points()
         print('All requested modes complete.', flush=True)
