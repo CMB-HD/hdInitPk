@@ -77,13 +77,15 @@ Table VI is a table of CAMB and CLASS computation times and is not reproduced by
 
 It reads the chains, the Fisher matrices, the Figure 6 points and the binning files from `hdinitpk/data`. Each saved Fisher matrix already includes the $\tau$ prior and, where applicable, the $\log_{10}(T_\mathrm{AGN})$ prior and the DESI BAO Fisher, exactly as applied in the paper, so the error tables follow from a matrix inversion.
 
-By default the notebook uses the thinned chains distributed with the package. To use chains you have run yourself with `run_hdInitPk_current.ipynb`, set
+By default the notebook uses the thinned chains distributed with the package. To use results you have run yourself with `run_hdInitPk_current.ipynb`, set
 
 ```python
-chain_source = 'custom'
+chain_source = 'custom' # for the chains
+fisher_source = 'custom' # for the fisher forecasts
+fig6_source = 'custom' # for the figure 6 points
 ```
 
-near the top. The notebook then reads the full chains from `hdinitpk/data/user_generated_data/chains`, in the format Cobaya wrote them, and removes the burn-in on load. The Fisher forecasts, the Figure 6 points and the binning files still come from the package.
+near the top. The notebook then reads the results from `hdinitpk/data/user_generated_data`, in the format the scripts or cobayawrote them, and removes 0.5 burn-in from the chains. 
 
 ## Rebuilding the Fisher forecasts
 
