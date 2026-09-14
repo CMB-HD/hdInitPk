@@ -1,22 +1,3 @@
-# ---------------------------------------------------------------------------
-# Fiducial CLASS parameters.
-#
-# Native CLASS input: every key is passed straight to `classy.Class.set()`.
-# There is no translation from CAMB parameter names.
-#
-# Values reproduce what the old `set_class_params` translation produced from
-# the CAMB `fiducial_params.yaml`, EXCEPT for the neutrino setup (see below).
-#
-# Handling applied in `theory.set_class_params`:
-#   * `l_max_scalars`  - theory saved to this multipole; CLASS asked for +500.
-#   * `Neff`           - if given instead of `N_ur`, derives
-#                        N_ur = Neff - (N_ncdm * deg_ncdm) * 1.0131966
-#   * `H0`/`theta_s_100` - one is dropped according to `use_H0`.
-#   * any key set to `null` is dropped, so CLASS uses its own default.
-#
-# ---------------------------------------------------------------------------
-
-
 # ----- cosmological parameters -----
 # From Planck 2018 TT,TE,EE + lowl + lowE + lensing, matching the CAMB file.
 omega_b: 0.02237          # was ombh2
