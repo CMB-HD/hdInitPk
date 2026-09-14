@@ -23,11 +23,6 @@ scripts and notebooks fill it in as you run them.
     resolved_params/                 Copies of the CLASS parameter files
                                      with the sBBN table path filled in.
 
-Set the environment variable HDINITPK_USER_DATA to put all of this
-somewhere else. That is worth doing if hdinitpk is installed somewhere
-read-only, or if you would rather the derivative directories not sit inside
-site-packages, where a reinstall would remove them.
-
 To use what you have generated instead of what ships with the package, set
 
     chain_source = 'custom'
