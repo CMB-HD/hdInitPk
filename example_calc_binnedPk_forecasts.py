@@ -1,4 +1,4 @@
-"""Example: one binned-P(k) Fisher forecast, start to finish.
+"""One binned-P(k) Fisher forecast, for example
 
 This is the smallest complete example of what `hdinitpk` adds to
 `hdfisher`: it calculates the Fisher derivatives for a binned primordial
@@ -17,7 +17,7 @@ perturbing the spectrum inside k bin n only.
 
 Run it under MPI to spread the parameter variations over several tasks:
 
-    mpirun -n 12 python example_calc_binnedPk_forecasts.py
+    mpirun -n 6 python example_calc_binnedPk_forecasts.py
 
 All nine configurations in the paper, and all twenty Fisher matrices built
 from them, are in `run_hdInitPk_forecasts.py`;
@@ -37,8 +37,7 @@ from hdinitpk import hdinitPkfisher
 # Where the derivatives go. They land under
 # `hdinitpk/data/user_generated_data/fisher_derivs`, alongside everything
 # else this repository generates; set HDINITPK_USER_DATA to move that
-# somewhere else, which is worth doing since they are large (tens of GB for
-# a run this size).
+# somewhere else, if you prefer.
 fisher_dir = hdinitpk.user_data_path('fisher_derivs', 'so_binned_pk')
 
 # The fiducial parameters and the step sizes ship with the package, in
@@ -68,7 +67,7 @@ bin_edges = np.append(k_bins[:, 0], k_bins[-1, 1])
 # `Pk<n>` in the steps file. The two MUST agree, so this 0.05 goes with
 # the `..._5_percent.yaml` above. (A mismatch raises a warning from
 # `hdinitpk.theory.build_binned_pk_transfer` rather than an error, and the
-# derivatives come out wrong by exactly the ratio of the two.) Rerunning
+# derivatives come out wrong) Rerunning
 # with the 1% and 10% steps files (and 0.01 and 0.10 here) is how the
 # derivatives in the paper were checked for convergence.
 pk_frac_step = 0.05
@@ -88,14 +87,14 @@ fisherlib = hdinitPkfisher.Fisher(
     param_file=param_file)
 
 # The expensive part: two CAMB calls per parameter, for every parameter in
-# the steps file. Hours, which is what the MPI ranks are for. The
+# the steps file. Takes hours without MPI. The
 # derivatives are written into `fisher_dir` along with copies of the
 # fiducial-parameter and step-size files, so a later `Fisher` pointed at
 # the same directory reads them back without recomputing.
 fisherlib.calculate_fisher_derivs()
 mpi.comm.barrier()
 
-# The cheap part, and serial. `get_fisher` assembles the matrix from the
+# Fisher matrices, which are comparively fast to make. `get_fisher` assembles the matrix from the
 # derivatives and the covariance, and returns it together with the list of
 # parameters it is indexed by. The paper's SO forecast keeps the first
 # seven bin amplitudes and marginalizes over the background parameters;
