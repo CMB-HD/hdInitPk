@@ -1,29 +1,3 @@
-# ---------------------------------------------------------------------------
-# Fiducial CLASS parameters for the w0waCDM + alpha_s forecast.
-#
-# `class_fiducial_params.yaml` with a dark-energy fluid added; every other
-# value, including the whole accuracy block, is unchanged. It is the CLASS
-# counterpart of camb_w0wa_fiducial_params.yaml.
-#
-# Native CLASS input: every key is passed straight to `classy.Class.set()`.
-# There is no translation from CAMB parameter names.
-#
-# Values reproduce what the old `set_class_params` translation produced from
-# the CAMB `fiducial_params.yaml`, EXCEPT for the neutrino setup (see below).
-#
-# Handling applied in `theory.set_class_params`:
-#   * `l_max_scalars`  - theory saved to this multipole; CLASS asked for +500.
-#   * `Neff`           - if given instead of `N_ur`, derives
-#                        N_ur = Neff - (N_ncdm * deg_ncdm) * 1.0131966
-#   * `H0`/`theta_s_100` - one is dropped according to `use_H0`.
-#   * any key set to `null` is dropped, so CLASS uses its own default.
-#
-# DO NOT write `key: null` in this file. `Fisher.save_param_steps_values`
-# calls float() on every fiducial value and raises TypeError on None. Comment
-# the key out instead, or apply the None guard described in the change notes.
-# ---------------------------------------------------------------------------
-
-
 # ----- cosmological parameters -----
 # From Planck 2018 TT,TE,EE + lowl + lowE + lensing, matching the CAMB file.
 omega_b: 0.02237          # was ombh2
@@ -72,7 +46,7 @@ l_max_scalars: 24000
 # CLASS only uses the fluid when the cosmological constant is switched off:
 # with `Omega_Lambda: 0` it closes the energy budget with `Omega_fld`
 # instead, and w(a) then follows the two parameters below. Leaving
-# `Omega_Lambda` at its default would silently keep a cosmological constant
+# `Omega_Lambda` at its default would keep a cosmological constant
 # and ignore w0_fld and wa_fld entirely.
 #
 # `CLP` is w(a) = w0_fld + wa_fld * (1 - a), the same parameterization as
