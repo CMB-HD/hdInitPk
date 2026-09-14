@@ -60,7 +60,7 @@ T_cmb: 2.7255
 #     <this repository>/hdinitpk/data/class_inputs/PRIMAT21_class_format.dat
 # so replace `/path/to/hdInitPk` below with the location of the repository.
 # (It was `/gpfs/home/zcheslog/cmb_hd/PRIMAT21_class_format.dat` on SeaWulf.)
-sBBN file: '/gpfs/projects/SehgalGroup/zcheslog/cmb_hd/hdinitPk_new/hdinitpk/data/class_inputs/PRIMAT21_class_format.dat'
+sBBN file: '/path/to/hdInitPk/hdinitpk/data/class_inputs/PRIMAT21_class_format.dat'
 
 
 # ----- accuracy settings -----
