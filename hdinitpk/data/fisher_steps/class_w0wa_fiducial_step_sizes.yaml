@@ -1,32 +1,3 @@
-# ---------------------------------------------------------------------------
-# Step sizes for the w0waCDM + alpha_s CLASS forecast.
-#
-# `class_fiducial_step_sizes.yaml` with the two dark-energy parameters added.
-# The names are CLASS's own, matching class_w0wa_fiducial_params.yaml:
-#
-#     ombh2 -> omega_b        nnu  -> Neff         w  -> w0_fld
-#     omch2 -> omega_cdm      mnu  -> sum_m_ncdm   wa -> wa_fld
-#     tau   -> tau_reio       nrun -> alpha_s
-#     logA  -> ln_A_s_1e10    ns   -> n_s
-#
-# `theta_s_100` is deliberately absent, as it is from the file this was
-# built from: with `use_H0=True` it is dropped in favour of `H0` anyway.
-# Its fiducial value still lives in the parameter file.
-#
-# Every step size and step type matches camb_w0wa_fiducial_step_sizes.yaml
-# exactly; only the names differ. The CAMB and CLASS w0wa forecasts
-# therefore step each parameter, w and wa included, by the same amount.
-#
-# `sum_m_ncdm` is the TOTAL neutrino mass, the same quantity as CAMB's
-# `mnu`, so its 10% relative step needs no rescaling when the two Fisher
-# matrices are compared.
-#
-# NOTE: a Fisher matrix built with this file is labelled with CLASS
-# parameter names, so `add_fishers` and `get_common_params` will find
-# nothing in common with a CAMB Fisher matrix. Rename before combining or
-# comparing; `to_class` in run_hdInitPk_forecasts.py does that.
-# ---------------------------------------------------------------------------
-
 omega_b:
         step_size: 0.01
         step_type: relative
