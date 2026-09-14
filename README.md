@@ -1,6 +1,6 @@
 # hdInitPk
 
-This repository contains the code used in the analysis and forecasts of [Cheslog, Finson, MacInnis, Sehgal, Afshordi, Nerval, and Hložek (2026)](https://arxiv.org/abs/XXXX.XXXXX). Please cite that work if you use this software or the associated data.
+This repository contains the code used in the analysis and forecasts of [Cheslog, Finson, MacInnis, Sehgal, Afshordi, Nerval, and Hložek (2026)](https://arxiv.org/abs/XXXX.XXXXX). (TO DO: add archive number) Please cite that work if you use this software or the associated data.
 
 We constrain the primordial scalar power spectrum $\mathcal{P}(k)$ both as a power law, with an amplitude $A_\mathrm{s}$, spectral index $n_\mathrm{s}$, and running $\alpha_\mathrm{s}$, and as a general binned function of wavenumber. The current constraints come from *Planck* 2018, ACT DR6, SPT-3G D1, and the joint ACT-*Planck*-SPT (APS) CMB lensing reconstruction (the combination we call CMB-PAS), together with DESI DR2 BAO. We also forecast the constraints achievable with SO-like and CMB-HD-like surveys.
 
