@@ -25,7 +25,7 @@ rescaling stays per-row.
 
 The CAMB ACCURACY SETTINGS are NOT shared: each mode keeps exactly the
 settings of the script it came from (`make_camb_params_fisher` = Listing 1;
-`make_camb_params_chain` = the original chain script). Each builder gets
+`make_camb_params_chain` = ACT DR6 settings). Each builder gets
 its own startup normalization check. NOTE that chain mode's kmax=10 covers
 the 7-bin scheme (k <= 0.41 Mpc^-1) but not the 11-bin scheme (k up to
 27.4 Mpc^-1); an 11-bin chain raises a clear error instead of silently
@@ -209,9 +209,7 @@ TRANSFER_K_IN_HUNITS = False
 # computing power spectra; set False to go through get_results instead.
 USE_GET_TRANSFER_FUNCTIONS = True
 
-# Force NonLinear_none for the transfer runs (one flag per mode). Leave
-# False to keep each original script's NonLinear setup exactly; the
-# normalization checks verify the transfer is still linear either way.
+# Force NonLinear_none for the transfer runs (one flag per mode).
 FORCE_LINEAR_NONLINEAR_NONE = False        # fisher mode
 FORCE_LINEAR_NONLINEAR_NONE_CHAIN = False  # chain mode
 
@@ -300,7 +298,7 @@ def hd_Pk(k):
 
 
 # ----------------------------------------------------------------------
-# CAMB parameters: one builder per mode, each with that mode's original
+# CAMB parameters: one builder per mode, each with that mode's 
 # accuracy settings.
 # ----------------------------------------------------------------------
 LMAX = 24000
@@ -314,7 +312,7 @@ LISTING1_ACCURACY = {
     'min_l_logl_sampling': 10000,
 }
 
-# Chain mode (the original chain script):
+# Chain mode :
 CHAIN_CAMB_ACCURACY_SETTINGS = {
     'kmax': 10,
     'k_per_logint': 130,
@@ -360,8 +358,7 @@ def make_camb_params_fisher(ombh2, omch2, H0, tau, force_linear=None):
 
 
 def make_camb_params_chain(ombh2, omch2, H0, tau, force_linear=None):
-    """CAMBparams for one chain-mode cosmology, using exactly the accuracy
-    settings of the original chain script (via camb.set_params)."""
+    """CAMBparams for one chain-mode cosmology"""
     if force_linear is None:
         force_linear = FORCE_LINEAR_NONLINEAR_NONE_CHAIN
     pars = camb.set_params(
@@ -603,8 +600,7 @@ def draw_samples(fisher_matrix, fisher_params, n_samples, seed):
     (getdist GaussianND centered on the fiducials, inverse Fisher as the
     covariance). Samples CAMB cannot be called on (nonpositive density,
     negative tau, nonpositive H0) are dropped and counted. Samples with a
-    nonpositive P(k) bin are counted but NOT dropped, matching the original
-    script; those give a negative Plin in that bin."""
+    nonpositive P(k) bin are counted but NOT dropped"""
     params = list(fisher_params)
     mean = np.array([FID_PARAMS[p] for p in params])
     cov = np.linalg.inv(fisher_matrix)
@@ -912,8 +908,7 @@ def compute_plin_for_chain(chain_path, tag, progress_every=1000):
     pk_samp = (df[pk_cols].to_numpy(float) * pk_unit
                / np.exp(-2.0 * tau)[:, None])
 
-    # One CAMB call per unique cosmology. T^2 does not depend on tau, but
-    # tau stays in the dedup key for exact parity with the original script.
+    # One CAMB call per unique cosmology.
     cosmo = np.column_stack([ombh2, omch2, H0, tau])
     _, first_idx, inverse = np.unique(cosmo, axis=0, return_index=True,
                                       return_inverse=True)
