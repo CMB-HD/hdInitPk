@@ -127,7 +127,7 @@ hd_data_version = 'v1.2'   # the CMB-HD mock data version, from hdMockData
 use_H0 = True
 
 # Fisher mode only: number of Gaussian samples per experiment.
-N_SAMPLES = 50000
+N_SAMPLES = 10000
 SEED = 20260728
 OVERWRITE = True
 
@@ -142,11 +142,8 @@ OVERWRITE = True
 #               `hdinitpk/cobaya_yaml_files/binned_pk`, following
 #               run_hdInitPk_current.ipynb. Full cobaya output, read from
 #               `hdinitpk/data/user_generated_data/chains`.
-#   'raw'       your own FULL, un-thinned cobaya output. THIS IS WHAT THE
-#               PAPER USED. Thinning changes the sampling of the posterior
-#               slightly, so the P_lin(k) errors from the two thinned
-#               sources can differ from the published ones at the level of
-#               the thinning noise.
+#   'raw'       your own FULL, un-thinned cobaya output. This lets you specify 
+#               your own path to chains you have written anywhere (RAW_CHAIN_ROOT)
 #
 # `find_chain_files` handles either layout: a getdist root (`<root>.txt`
 # with `<root>.paramnames` beside it), or a set of raw cobaya files
