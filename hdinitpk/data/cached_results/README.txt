@@ -3,7 +3,7 @@ FULL (un-thinned) chains and read by `load_saved_results` in
 hdInitPk_plots.ipynb. Format: one row per quantity, the row name followed
 by its values, with '#' comment lines ignored.
 
-Expected files:
+Files:
 
     binned_pk_stats_7bin.txt
         Rows: p_act_means, p_act_lower_errs, p_act_upper_errs,
