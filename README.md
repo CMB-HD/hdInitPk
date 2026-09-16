@@ -82,10 +82,10 @@ By default the notebook uses the thinned chains distributed with the package. To
 ```python
 chain_source = 'custom' # for the chains
 fisher_source = 'custom' # for the fisher forecasts
-fig6_source = 'custom' # for the figure 6 points
+fig6_source = 'custom_both' # for the figure 6 points
 ```
 
-near the top. The notebook then reads the results from `hdinitpk/data/user_generated_data`, in the format the scripts or cobayawrote them, and removes 0.5 burn-in from the chains. 
+near the top. The notebook then reads the results from `hdinitpk/data/user_generated_data`, in the format the scripts or cobaya wrote them, and removes 0.5 burn-in from the chains. The Figure 6 points come in two halves, so `fig6_source` can also be `'custom_fisher'`, to use your own CMB-HD and SO-like points (from the fisher mode of `run_hdInitPk_to_LinearPk.py`) with the published CMB-PAS points, or `'custom_chain'`, to use your own CMB-PAS points (from its chain mode) with the published CMB-HD and SO-like points.
 
 ## Rebuilding the Fisher forecasts
 

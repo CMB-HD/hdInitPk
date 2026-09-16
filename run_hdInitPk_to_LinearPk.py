@@ -114,8 +114,9 @@ binning_path = hdinitpk.data_path('binning')
 # sample arrays, which are bulky. `out_dir_fig6` holds the small per-bin
 # summaries that the plotting notebook reads, in the same five-column
 # format and under the same names as the `fig6_points_*.txt` files
-# distributed with the package, so that setting `fig6_source = 'custom'`
-# there picks them up with no other change.
+# distributed with the package, so that setting `fig6_source` there to
+# `'custom_both'` (or to `'custom_fisher'` or `'custom_chain'`, for the
+# points from one mode only) picks them up with no other change.
 out_dir_fisher = hdinitpk.user_data_path('plin_z0', 'from_fisher')
 out_dir_chains = hdinitpk.user_data_path('plin_z0', 'from_chains')
 out_dir_fig6 = hdinitpk.user_data_path('fig6')
