@@ -162,7 +162,7 @@ mpirun -np 6 cobaya-run mcmc_runs/cmb_pas_desi_7_bins_arbitrary_binning.yaml
 
 where `mcmc_runs/` is the directory of prepared copies that `run_hdInitPk_current.ipynb` writes. That notebook lists the command for every input file. We remove the first half of each chain as burn-in and consider a run converged once its Gelman-Rubin statistic $R-1$ is below 0.01.
 
-Each file's `sampler.mcmc.covmat` points at a proposal covariance in `hdinitpk/data/proposal_matrices/`, built from that run's own converged chain. These ship with the package, and are what make these runs tractable to restart.
+Each file's `sampler.mcmc.covmat` points at a proposal covariance in `hdinitpk/data/proposal_matrices/`, built from that run's own converged chain. These ship with the package.
 
 ## External likelihoods
 
