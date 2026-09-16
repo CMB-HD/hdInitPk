@@ -20,7 +20,7 @@
 #debug: True
 ## NOTE: indicate where the products will be written and a prefix for their name
 ##  see https://cobaya.readthedocs.io/en/latest/output.html#output-shell
-output: /path/to/chains/class_chains/new_covmat_hd_class_9_param
+output: /path/to/chains/hd_class_9_param
 ## this will automatically resume previously-run MCMC chains with the same 
 ##  `output` path that you've provided above
 resume: True

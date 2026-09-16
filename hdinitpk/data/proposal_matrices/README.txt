@@ -7,8 +7,8 @@ its own run's full, converged chain, so every Cobaya input file gets the
 proposal from the chain it produced:
 
     CMB-HD mock chains (Figure 9)
-        hd_camb_6param.covmat      HD/camb_lcdm_likelihood.yaml
-        hd_camb_9param.covmat      HD/camb_nrun_likelihood.yaml
+        hd_camb_6param.covmat      HD/camb_nrun_likelihood.yaml
+        hd_camb_9param.covmat      HD/camb_lcdm_likelihood.yaml
         hd_class_6param.covmat     HD/class_lcdm_likelihood.yaml
         hd_class_9param.covmat     HD/class_nrun_likelihood.yaml
 
