@@ -47,6 +47,7 @@ likelihood:
     Lmax: 20100
     use_cmb_power_spectra: True
     use_cmb_lensing_spectrum: True
+    use_class: True
   ## To include DESI BAO data, un-comment the `bao.generic` block below.
   ## NOTE that you must provide the *absolute* path to the 
   ##      `measurements_file` and `cov_file` below. Here, they are given
