@@ -5,7 +5,9 @@ template used in Cheslog et. al. (2026).
 
 - The primordial power spectrum can be a set of amplitudes in k bins
   (`Pk1`, `Pk2`, ... or `eneg2tauPk1`, ...) instead of a power law. The
-  CMB and lensing spectra are then calculated with CAMB and `hd_pk`.
+  CMB and lensing spectra are then calculated with CAMB and `hd_pk`,
+  whose `calculate_clkk` integral gives the lensing spectrum and whose
+  `calculate_theory_spectra` gives the delensed spectra.
 - A kinematic SZ template, loaded from hdMockData, can be added to the
   theory TT spectrum, with an amplitude `A_ksz` and a tilt `n_ksz`.
 
@@ -42,7 +44,7 @@ BIN_PARAM = re.compile(r'^(k|Pk|eneg2tauPk)(\d+)$')
 
 # ----- the kSZ template -----
 
-def get_cl_ksz(lmax, A_ksz, n_ksz):
+def get_cl_ksz(lmax, A_ksz, n_ksz, hd_data_version='latest'):
     """The kSZ template from hdMockData, scaled by the amplitude `A_ksz`
     and the tilt `n_ksz` about ell = 3000, from ell = 0 to `lmax`.
 
@@ -53,13 +55,15 @@ def get_cl_ksz(lmax, A_ksz, n_ksz):
     A_ksz, n_ksz : float
         The amplitude and the tilt of the template, so that
         cl_ksz(ell) = A_ksz * (ell / 3000)^n_ksz * template(ell).
+    hd_data_version : str, default='latest'
+        The version of the CMB-HD mock data the template is read from.
 
     Returns
     -------
     cl_ksz : array_like of float
         The scaled template, in uK^2, starting at ell = 0.
     """
-    ells, template = hd_data.HDMockData().cl_ksz(output_lmax=lmax)
+    ells, template = hd_data.HDMockData(version=hd_data_version).cl_ksz(output_lmax=lmax)
     with np.errstate(divide='ignore', invalid='ignore'):
         cl_ksz = A_ksz * (ells / 3000)**n_ksz * template
     cl_ksz[:2] = 0
@@ -171,11 +175,12 @@ def binned_pk_camb_params(camb_params, bin_edges=None, varied_bin=None,
     return pars, pk_transfer_function
 
 
-def binned_pk_spectra(lmax, camb_results, clkk, cmb_types=['lensed', 'unlensed'],
-                      nlkk=None, Lmin=None, Lmax=None):
-    """The CMB spectra for a binned primordial power spectrum, given the
-    CAMB results for that spectrum and its lensing power spectrum. This
-    follows `hd_pk.cmb_from_pk.calculate_theory_spectra`.
+def binned_pk_spectra(lmax, camb_results, clkk, cmb_types=['lensed', 'unlensed']):
+    """The lensed and unlensed CMB spectra for a binned primordial power
+    spectrum, given the CAMB results for that spectrum and its lensing
+    power spectrum, in the same way as
+    `hd_pk.cmb_from_pk.calculate_theory_spectra`. The delensed spectra
+    come from that function itself; see `Theory.calculate_spectra`.
 
     Parameters
     ----------
@@ -188,12 +193,7 @@ def binned_pk_spectra(lmax, camb_results, clkk, cmb_types=['lensed', 'unlensed']
         spectrum, C_L^kk = [L(L+1)]^2 C_L^phiphi / 4, from L = 0 to at
         least the maximum multipole CAMB calculated.
     cmb_types : list of str, default=['lensed', 'unlensed']
-        Any of `'lensed'`, `'unlensed'`, and `'delensed'`.
-    nlkk : array_like of float, default=None
-        The lensing reconstruction noise, needed for the delensed spectra.
-    Lmin, Lmax : int, default=None
-        The multipole range of the lensing reconstruction, needed for the
-        delensed spectra.
+        Any of `'lensed'` and `'unlensed'`.
 
     Returns
     -------
@@ -205,12 +205,7 @@ def binned_pk_spectra(lmax, camb_results, clkk, cmb_types=['lensed', 'unlensed']
     ells = np.arange(lmax + 1)
     theo = {}
     for cmb_type in cmb_types:
-        if cmb_type == 'delensed':
-            cl = hdtheory.get_residual_lensing(clkk, nlkk, Lmin, Lmax, len(clkk) - 1)
-        elif cmb_type == 'unlensed':
-            cl = np.zeros_like(clkk)
-        else:
-            cl = clkk
+        cl = np.zeros_like(clkk) if (cmb_type == 'unlensed') else clkk
         cls = camb_results.get_lensed_cls_with_spectrum(
             cl * 4 / (2 * np.pi), lmax=lmax, CMB_unit='muK', raw_cl=True)
         theo[cmb_type] = {'ells': ells.copy(), 'kk': clkk[:lmax+1].copy()}
@@ -252,6 +247,10 @@ class Theory(hdtheory.Theory):
         size given for the bin amplitudes in the Fisher step-size file,
         since the finite difference divides by that step. A warning is
         issued if the two disagree.
+    hd_data_version : str, default='latest'
+        The version of the CMB-HD mock data, used for the kSZ template,
+        the BBN table CLASS reads, and the lensing reconstruction noise
+        `hd_pk` uses for the delensed binned P(k) spectra.
 
     Notes
     -----
@@ -259,7 +258,11 @@ class Theory(hdtheory.Theory):
     different from its fiducial value, the power inside bin `n` is scaled
     by `1 + pk_frac_step` (or `1 - pk_frac_step`, if the value is below
     the fiducial one). The spectra are then calculated with CAMB and
-    `hd_pk`, following MacInnis & Sehgal (2024).
+    `hd_pk`, following MacInnis & Sehgal (2024). The lensing spectrum is
+    the `hd_pk` integral over the matter power spectrum, and the delensed
+    spectra come from `hd_pk.cmb_from_pk.calculate_theory_spectra`, which
+    delenses with the minimum-variance lensing reconstruction noise from
+    hdMockData rather than the `nlkk` passed here.
 
     The parameter file's maximum multipole is not used; the spectra are
     calculated to `lmax + LMAX_BUFFER` and kept to `lmax`.
@@ -268,9 +271,10 @@ class Theory(hdtheory.Theory):
     def __init__(self, lmax, output_dir, output_root=None, param_file=None,
                  nlkk=None, recon_lmin=None, recon_lmax=None, use_H0=False,
                  use_class=False, binned_pk=False, bin_edges=None, ksz=False,
-                 pk_frac_step=0.05, **cosmo_params):
+                 pk_frac_step=0.05, hd_data_version='latest', **cosmo_params):
         self.binned_pk = binned_pk
         self.pk_frac_step = pk_frac_step
+        self.hd_data_version = hd_data_version
         if isinstance(bin_edges, str):
             bin_edges = np.loadtxt(bin_edges)
         self.bin_edges = None if (bin_edges is None) else np.asarray(bin_edges, dtype=float)
@@ -300,7 +304,8 @@ class Theory(hdtheory.Theory):
                 raise ValueError("The binned P(k) is only calculated with CAMB; set `use_class=False`.")
             self.camb_params = None
             # CLASS reads the BBN table itself, so it needs the full path
-            cosmo_params.setdefault('sBBN file', hd_data.HDMockData().class_sbbn_file)
+            cosmo_params.setdefault(
+                'sBBN file', hd_data.HDMockData(version=self.hd_data_version).class_sbbn_file)
             self.class_params = hdtheory.set_class_params(
                 self.lmax, param_file=param_file, use_H0=use_H0, **cosmo_params)
             self.class_params['l_max_scalars'] = self.lmax + LMAX_BUFFER
@@ -329,7 +334,9 @@ class Theory(hdtheory.Theory):
 
     def get_binned_pk_results(self):
         """The CAMB results and the lensing power spectrum for the binned
-        primordial spectrum, calculated once and kept."""
+        primordial spectrum, calculated once and kept, along with the CAMB
+        parameters of the fiducial power law and the transfer function of
+        the varied bin that `hd_pk` takes."""
         if self._binned_pk_results is None:
             effective_ns = self.fid_params.get('effective_ns_for_nonlinear')
             pars_fid, _ = binned_pk_camb_params(self.camb_params, effective_ns=effective_ns)
@@ -342,7 +349,7 @@ class Theory(hdtheory.Theory):
                     effective_ns=effective_ns)
             results = camb.get_results(pars)
             clkk = cmb_from_pk.calculate_clkk(pars_fid, pk_transfer_function=pk_transfer_function)
-            self._binned_pk_results = (results, clkk)
+            self._binned_pk_results = (results, clkk, pars_fid, pk_transfer_function)
         return self._binned_pk_results
 
 
@@ -352,9 +359,15 @@ class Theory(hdtheory.Theory):
         binned P(k), and with hdfisher otherwise. The kSZ template is added
         to TT if `ksz=True`."""
         if self.binned_pk:
-            results, clkk = self.get_binned_pk_results()
-            theo = binned_pk_spectra(self.lmax, results, clkk, cmb_types=cmb_types,
-                                     nlkk=self.nlkk, Lmin=self.Lmin, Lmax=self.Lmax)
+            results, clkk, pars_fid, pk_transfer_function = self.get_binned_pk_results()
+            theo = binned_pk_spectra(self.lmax, results, clkk,
+                                     cmb_types=[t for t in cmb_types if t != 'delensed'])
+            if 'delensed' in cmb_types:
+                theo['delensed'] = cmb_from_pk.calculate_theory_spectra(
+                    self.lmax, pars_fid, camb_results=results,
+                    pk_transfer_function=pk_transfer_function,
+                    cmb_types=['delensed'],
+                    hd_data_version=self.hd_data_version)['delensed']
         else:
             # hdfisher's own calculation, with CAMB or CLASS, done fresh
             theo = {}
@@ -364,7 +377,8 @@ class Theory(hdtheory.Theory):
                 theo['delensed'] = super().get_delensed_spectra(overwrite=True, save=False)
             theo = {cmb_type: theo[cmb_type] for cmb_type in cmb_types}
         if self.ksz:
-            cl_ksz = get_cl_ksz(self.lmax, self.A_ksz, self.n_ksz)
+            cl_ksz = get_cl_ksz(self.lmax, self.A_ksz, self.n_ksz,
+                                hd_data_version=self.hd_data_version)
             for cmb_type in theo:
                 theo[cmb_type]['tt'] = theo[cmb_type]['tt'] + cl_ksz
         return theo
