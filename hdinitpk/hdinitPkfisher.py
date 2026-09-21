@@ -150,6 +150,7 @@ class Fisher(hdfisher_fisher.Fisher):
                                 binned_pk=self.binned_pk,
                                 bin_edges=self.bin_edges, ksz=self.ksz,
                                 pk_frac_step=self.pk_frac_step,
+                                hd_data_version=self.hd_data_version,
                                 **cosmo_params)
         cmb_theo = theolib.get_theory(cmb_types=self.cmb_types, save=False,
                                       output_lmax=self.lmax)
