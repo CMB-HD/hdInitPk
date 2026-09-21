@@ -183,7 +183,7 @@ These are not dependencies of `hdinitpk` itself. Install only the ones the runs 
 Two theory-side requirements are worth calling out.
 
 - Every current-data file sets `recombination_model: CosmoRec`. CAMB must be built against [CosmoRec](https://www.jb.man.ac.uk/~jchluba/Science/CosmoRec/CosmoRec.html), which is not the default. See CAMB's [recombination models](https://camb.readthedocs.io/en/latest/recombination.html) documentation.
-- `HD/class_*_likelihood.yaml` use `classy` rather than `camb`, so they need [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper, modified as described in Appendix A of the paper. The BBN table those files point at ships with hdMockData, so the `/path/to/hdMockData` placeholder in them must point at your hdMockData checkout. They set `use_class: True` so that hdlike compares the theory to the CMB-HD bandpowers calculated with CLASS, which also come from hdMockData.
+- `HD/class_*_likelihood.yaml` use `classy` rather than `camb`, so they need [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper, modified as described in Appendix A of the paper. The BBN table those files point at ships with hdMockData, so the `/path/to/hdMockData` placeholder in them must point at your hdMockData directory. They set `use_class: True` so that hdlike compares the theory to the CMB-HD bandpowers calculated with CLASS, which also come from hdMockData.
 
 # Running a binned primordial P(k) with arbitrary binning
 
