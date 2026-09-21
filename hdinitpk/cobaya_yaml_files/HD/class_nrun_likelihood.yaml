@@ -9,11 +9,12 @@
 #   /path/to/chains          where the MCMC chains live, both the ones
 #                            these runs read as proposal covariances and
 #                            the ones they write. Too large to distribute.
+#   /path/to/hdMockData      the hdMockData checkout, for the BBN table
+#                            that CLASS reads
 #
-# The proposal matrices and the CLASS sBBN table
-# (`PRIMAT21_class_format.dat`) ship with the package, under
-# `hdinitpk/data/proposal_matrices/` and `hdinitpk/data/class_inputs/`, so
-# they resolve under `/path/to/hdInitPk`.
+# The proposal matrices ship with the package, under
+# `hdinitpk/data/proposal_matrices/`, so they resolve under
+# `/path/to/hdInitPk`.
 #
 # `output:` is where this run WRITES its chains; the rest are inputs.
 # ----------------------------------------------------------------------
@@ -29,12 +30,6 @@ resume: True
 likelihood:
   hdlike.hdlike.HDLike:
     ## see `hdlike_settings.yaml` for a description of each setting
-    ## The CLASS bandpowers. HDLike's own default is the CAMB set, so
-    ##  these are given explicitly; the file is identical to hdMockData's
-    ##  `hd_lmin30lmax20100_lensed_CLASS_bandpowers_mcmc_v1.2.txt`. The
-    ##  covariance matrix, bin edges, and lensing reconstruction noise
-    ##  still come from hdMockData at the version below.
-    data_file: /path/to/hdInitPk/hdinitpk/data/hd_bandpowers/hdlike_class_bandpowers.txt
     ## The covariance matrix, the bin edges, and the lensing reconstruction
     ##  noise all come from `hdMockData`. Leaving `covmat_file` unset (the
     ##  HDLike default) makes the likelihood load them itself, for the data
@@ -46,6 +41,9 @@ likelihood:
     Lmax: 20100
     use_cmb_power_spectra: True
     use_cmb_lensing_spectrum: True
+    ## `use_class: True` makes the likelihood compare the theory to the
+    ##  CMB-HD bandpowers that were calculated with CLASS, which come
+    ##  from hdMockData like everything else above.
     use_class: True
   ## To include DESI BAO data, un-comment the `bao.generic` block below.
   ## NOTE that you must provide the *absolute* path to the 
@@ -64,7 +62,7 @@ theory:
         N_ncdm: 3
         T_cmb: 2.7255
         YHe: BBN
-        sBBN file: "/path/to/hdInitPk/hdinitpk/data/class_inputs/PRIMAT21_class_format.dat"
+        sBBN file: "/path/to/hdMockData/hd_mock_data/data/theory/PRIMAT_Yp_DH_ErrorMC_2021_CLASS.dat"
         non_linear: 'hmcode'
         hmcode_version: '2016'
         recombination: 'recfast'

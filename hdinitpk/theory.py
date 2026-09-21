@@ -1,18 +1,16 @@
-"""Theory calculation for the binned primordial power spectrum P(k) and the
-kSZ template, used in Cheslog et. al. (2026).
+"""Theory spectra for the binned primordial power spectrum and the kSZ
+template used in Cheslog et. al. (2026).
 
-This module extends `hdfisher.theory` (via the subclass seams added there)
-with the pieces that were removed from the merged hdfisher code:
+`hdinitpk.theory.Theory` extends `hdfisher.theory.Theory` in two ways.
 
-- a binned primordial power spectrum, described by an amplitude in each of a
-  set of k-bins (parameters `Pk1`, `Pk2`, ... or `eneg2tauPk1`, ...) rather
-  than by a power law, calculated with `hd_pk.cmb_from_pk`;
-- a kinematic SZ template added to the theory TT spectrum, scaled by an
-  amplitude `A_ksz` and tilt `n_ksz`, loaded from `hd_mock_data`.
+- The primordial power spectrum can be a set of amplitudes in k bins
+  (`Pk1`, `Pk2`, ... or `eneg2tauPk1`, ...) instead of a power law. The
+  CMB and lensing spectra are then calculated with CAMB and `hd_pk`.
+- A kinematic SZ template, loaded from hdMockData, can be added to the
+  theory TT spectrum, with an amplitude `A_ksz` and a tilt `n_ksz`.
 
-`hdinitpk.theory.Theory` accepts the same arguments as the old merged
-`hdfisher.theory.Theory`, so code written against the merged version only
-needs to change its import.
+Everything else (the spectra for a power-law P(k) with CAMB or CLASS, the
+loading and saving of the spectra, and the BAO theory) is done by hdfisher.
 """
 import os
 import re
@@ -20,407 +18,273 @@ import warnings
 import numpy as np
 import camb
 from scipy.interpolate import interp1d
+from hd_mock_data import hd_data
 from hdfisher import theory as hdtheory
+from hdfisher import utils, config
+from hd_pk import cmb_from_pk
 
-LMAX_BUFFER = hdtheory.LMAX_BUFFER
+
+# the Boltzmann code calculates the spectra this many multipoles past the
+# maximum multipole that is kept, as in hdfisher
+LMAX_BUFFER = 500
+
+# the order CAMB returns the CMB spectra in
+CAMB_SPECTRA = ['tt', 'ee', 'bb', 'te']
+
+# entries of the parameter file that CAMB does not take: the kSZ template
+# parameters, and the description of the binned P(k) (the number of bins,
+# the bin centers `k<n>`, the bin amplitudes `Pk<n>` or `eneg2tauPk<n>`,
+# and the effective spectral index used for the non-linear correction)
+KSZ_PARAMS = ['A_ksz', 'n_ksz']
+BINNED_PK_KEYS = ['nkbins', 'effective_ns_for_nonlinear']
+BIN_PARAM = re.compile(r'^(k|Pk|eneg2tauPk)(\d+)$')
 
 
-def _import_cmb_from_pk():
-    """Import and return `hd_pk.cmb_from_pk`, with a clear error message if
-    the `hd_pk` package is not installed. The import is done lazily so that
-    the kSZ-only functionality of this module works without `hd_pk`.
-    """
-    try:
-        from hd_pk import cmb_from_pk
-    except ImportError as err:
-        raise ImportError(
-            "The binned-Pk calculation requires the `hd_pk` package "
-            "(`cmb_from_pk`), which could not be imported. Install hdPk and "
-            "its dependencies, then try again.") from err
-    return cmb_from_pk
-
+# ----- the kSZ template -----
 
 def get_cl_ksz(lmax, A_ksz, n_ksz):
-    """Returns the kSZ template power spectrum, scaled by the amplitude
-    `A_ksz` and tilt `n_ksz`, from ell = 0 to `lmax`.
-
-    The template is loaded from `hd_mock_data`, normalized at ell = 3000,
-    and the first two multipoles are set to zero:
-        cl_ksz(ell) = A_ksz * (ell / 3000)^n_ksz * template(ell).
+    """The kSZ template from hdMockData, scaled by the amplitude `A_ksz`
+    and the tilt `n_ksz` about ell = 3000, from ell = 0 to `lmax`.
 
     Parameters
     ----------
     lmax : int
         The maximum multipole of the returned spectrum.
-    A_ksz : float
-        The template amplitude.
-    n_ksz : float
-        The template tilt.
+    A_ksz, n_ksz : float
+        The amplitude and the tilt of the template, so that
+        cl_ksz(ell) = A_ksz * (ell / 3000)^n_ksz * template(ell).
 
     Returns
     -------
     cl_ksz : array_like of float
-        The scaled kSZ template, starting at ell = 0.
-
-    Raises
-    ------
-    ValueError
-        If `A_ksz` or `n_ksz` is `None`, or if the template does not reach
-        `lmax`.
+        The scaled template, in uK^2, starting at ell = 0.
     """
-    if A_ksz is None:
-        raise ValueError("Must provide `A_ksz` when `ksz=True`")
-    if n_ksz is None:
-        raise ValueError("Must provide `n_ksz` when `ksz=True`")
-    from hd_mock_data import hd_data
-    datalib = hd_data.HDMockData()
-    # Ask for the template out to `lmax` explicitly. Left to itself,
-    # `cl_ksz` returns it only as far as the data version's own lmaxTT,
-    # which is 40000 for v1.1 but 20100 from v1.2 on, and the
-    # multiplication below then fails to broadcast. The underlying template
-    # file is the same one in every version, so asking for `lmax` makes
-    # this independent of which version is installed.
-    ksz_ells, cl_ksz_template = datalib.cl_ksz(output_lmax=lmax)
-    if len(cl_ksz_template) < lmax + 1:
-        raise ValueError(
-            f"the kSZ template from hd_mock_data reaches only ell = "
-            f"{len(cl_ksz_template) - 1}, but the theory is being computed "
-            f"to lmax = {lmax}. Lower `lmax` in the parameter file, or "
-            "supply a template that goes further.")
-    ells_for_ksz = np.arange(lmax + 1)
-    cl_ksz = A_ksz * (ells_for_ksz / 3000)**n_ksz * cl_ksz_template[:lmax+1]
+    ells, template = hd_data.HDMockData().cl_ksz(output_lmax=lmax)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        cl_ksz = A_ksz * (ells / 3000)**n_ksz * template
     cl_ksz[:2] = 0
     return cl_ksz
 
 
-# ----- cosmological parameters: -----
+# ----- CAMB parameters -----
 
-def set_cosmo_params(param_file=None, use_H0=False, binned_pk=False, **cosmo_params):
-    """Load the parameter values saved in the `param_file` and return a
-    dictionary that can be passed to `camb.set_params()`, optionally
-    converting the binned-Pk parameters into the internal form used by
-    `set_camb_params` and `build_binned_pk_transfer`.
-
-    This wraps `hdfisher.theory.set_cosmo_params` and adds back the
-    binned-Pk and kSZ handling that was removed from hdfisher: when
-    `binned_pk=True`, the k-bin centers (`k1`, ..., `kN`) and bin amplitudes
-    (`Pk1`, ... or `eneg2tauPk1`, ..., converted with exp(2 tau)) are
-    collected into a `'primordial_scalar_pk'` entry, the fiducial `'As'` is
-    moved to `'_fid_As'`, and the kSZ template parameters `'A_ksz'` and
-    `'n_ksz'` (which are not CAMB parameters) are always removed.
-
-    Parameters
-    ----------
-    param_file : str, default=None
-        The file name, including the absolute path, of a YAML file that
-        contains the parameter names and values. When `binned_pk=True`, the
-        file must contain an `'nkbins'` entry, the bin centers, the bin
-        amplitudes, and an `'effective_ns_for_nonlinear'` entry.
-    use_H0 : bool, default=False
-        Pass the Hubble constant instead of CosmoMC theta to CAMB, if both
-        are present in the parameter file.
-    binned_pk : bool, default=False
-        Whether the primordial power spectrum is described by binned
-        amplitudes rather than by a power law.
-    **cosmo_params : dict of float
-        An optional dictionary of parameter names and values to override
-        the values loaded from the YAML file.
-
-    Returns
-    -------
-    p : dict
-        A dictionary of the parameter names and values.
-    """
-    p = hdtheory.set_cosmo_params(param_file=param_file, use_H0=use_H0,
-                                  **cosmo_params)
-    if binned_pk:
-        p['ks'] = np.array([p['k{}'.format(b + 1)] for b in range(p['nkbins'])])
-        pk = np.zeros_like(p['ks'])
-        if 'eneg2tauPk1' in p.keys():
-            for b in range(p['nkbins']):
-                pk[b] = p['eneg2tauPk%s' % (b + 1)]
-            pk *= np.exp(2 * p['tau'])
-        elif 'Pk1' in p.keys():
-            for b in range(p['nkbins']):
-                pk[b] = p['Pk%s' % (b + 1)]
-        p['primordial_scalar_pk'] = {'k': p['ks'],
-                                         'Pk': pk, 'log_regular': False}
-        p['_fid_As'] = p['As'] 
-        p.pop('As')
-    # remove ksz params that are not CAMB parameters
-    for ksz_key in ['A_ksz', 'n_ksz']:
-        p.pop(ksz_key, None)
-    return p
+def remove_non_camb_params(params):
+    """Returns a copy of the `params` dict without the entries that
+    describe the binned P(k) or the kSZ template."""
+    return {key: value for key, value in params.items()
+            if (key not in KSZ_PARAMS + BINNED_PK_KEYS)
+            and (BIN_PARAM.match(key) is None)}
 
 
-def set_camb_params(lmax, param_file=None, use_H0=False, binned_pk=False, **cosmo_params):
-    """Returns a `CAMBparams` instance with the requested cosmological and
-    accuracy parameters, with support for the binned primordial power
-    spectrum and for parameter files containing kSZ template parameters.
-
-    This reproduces the behavior of the merged hdfisher `set_camb_params`:
-    for `binned_pk=False` it matches `hdfisher.theory.set_camb_params`
-    exactly, except that `'A_ksz'` and `'n_ksz'` entries are stripped before
-    the parameters are passed to CAMB (the base hdfisher function would
-    reject them). For `binned_pk=True`, the binned-Pk parameters are
-    removed from the CAMB input, the initial power spectrum is set to the
-    fiducial power law via `set_initial_power_function`, and the perturbed
-    bin amplitudes are recorded on the returned instance in the private
-    `_primordial_pk` attribute for use by `build_binned_pk_transfer`.
+def set_camb_params(lmax, param_file=None, use_H0=False, **cosmo_params):
+    """Returns a `CAMBparams` instance with the settings in the parameter
+    file, after removing the binned P(k) and kSZ entries that CAMB does not
+    take. The spectra are calculated to `lmax + LMAX_BUFFER`.
 
     Parameters
     ----------
     lmax : int
-        The maximum multipole for the theory spectra.
+        The maximum multipole of the theory spectra.
     param_file : str, default=None
-        The file name, including the absolute path, of a YAML file that
-        contains the parameter names and values.
+        The file name, including the absolute path, of a YAML file with
+        the parameter names and values. If not provided, the hdfisher
+        default is used.
     use_H0 : bool, default=False
         Pass the Hubble constant instead of CosmoMC theta to CAMB, if both
-        are present in the parameter file.
-    binned_pk : bool, default=False
-        Whether the primordial power spectrum is described by binned
-        amplitudes rather than by a power law.
+        are in the parameter file.
     **cosmo_params : dict of float
-        An optional dictionary of parameter names and values to override
-        the values loaded from the YAML file.
+        Parameter names and values that override the values in the file.
 
-    Returns
-    -------
-    pars_out : camb.model.CAMBparams
-        The CAMB parameters, carrying the private attributes `_fid_As`,
-        `_fid_ns`, and `_fid_kpivot` (and, when `binned_pk=True`,
-        `_primordial_pk`).
+    See Also
+    --------
+    hdfisher.theory.set_cosmo_params
     """
-    input_params = set_cosmo_params(param_file=param_file, use_H0=use_H0, binned_pk=binned_pk, **cosmo_params).copy()
-    if binned_pk == True:
-        primordial_scalar_pk = input_params['primordial_scalar_pk']
-        effective_ns_for_nonlinear = input_params['effective_ns_for_nonlinear']
-        ks = input_params['ks']
-        fid_As = input_params.pop('_fid_As')
-        input_params.pop('primordial_scalar_pk')
-        input_params.pop('ks')
-        bad_keys = [k for k in input_params if re.match(r'^k\d+$', k) or k.startswith('Pk') or k.startswith('eneg2tauPk') or k == 'nkbins' or k == 'effective_ns_for_nonlinear']
-        for k in bad_keys:
-            input_params.pop(k, None)
-    # the parameter file's `lmax` (if present) sets the multipole to which
-    # the theory is saved; CAMB computes `LMAX_BUFFER` multipoles beyond it
-    file_lmax = input_params.get('lmax')
-    theory_lmax = int(file_lmax) if file_lmax is not None else int(lmax)
-    input_params['lmax'] = theory_lmax + LMAX_BUFFER
-    # only pass `redshifts` to CAMB if the parameter file provided them;
-    # otherwise drop the key so CAMB uses its own default
-    if input_params.get('redshifts') is None:
-        input_params.pop('redshifts', None)
-    pars = camb.set_params(**input_params)
-    if binned_pk == True:
-        k_fine  = np.logspace(-6, 2, 10000)
-        pk_fine = fid_As * (k_fine / input_params.get('pivot_scalar', 0.05)) ** (input_params.get('ns', 0.965) - 1)
-        Pk_func = interp1d(k_fine, pk_fine, kind='linear',
-                           bounds_error=False,
-                           fill_value=(pk_fine[0], pk_fine[-1]))
-        pars.set_initial_power_function(
-            Pk_func,
-            effective_ns_for_nonlinear=effective_ns_for_nonlinear,
-            kmin=1e-6, kmax=100
-        )
-
-    pars_out = pars.copy()
-
-    if binned_pk == True:
-        pars_out._fid_As = fid_As
-        pars_out._fid_ns      = input_params.get('ns')
-        pars_out._fid_kpivot  = input_params.get('pivot_scalar', 0.05)
-        pars_out._primordial_pk = primordial_scalar_pk
-    else:
-        pars_out._fid_As     = input_params.get('As')
-        pars_out._fid_ns     = input_params.get('ns')
-        pars_out._fid_kpivot = input_params.get('pivot_scalar', 0.05)
-    return pars_out
+    params = hdtheory.set_cosmo_params(param_file=param_file, use_H0=use_H0,
+                                       **cosmo_params)
+    params = remove_non_camb_params(params)
+    params['lmax'] = int(lmax) + LMAX_BUFFER
+    return camb.set_params(**params)
 
 
-# ----- the binned-Pk transfer function: -----
+# ----- the binned P(k) -----
 
-def build_binned_pk_transfer(camb_params, camb_params_cdm, bin_edges,
-                             varied_param='fid', frac_step=0.05):
-    """Build CAMB results and a primordial-Pk transfer function for a
-    binned-Pk calculation when `varied_param` is varied. The lensed,
-    unlensed, and delensed spectra all respond identically because they are
-    all computed from the same results and transfer function.
+def binned_pk_camb_params(camb_params, bin_edges=None, varied_bin=None,
+                          step=0.0, effective_ns=None):
+    """A copy of `camb_params` whose primordial power spectrum is the
+    fiducial power law, tabulated on a fine k grid, with the power inside
+    one k bin scaled by `1 + step`.
 
-    The transfer function multiplies the fiducial power-law primordial
-    spectrum by `(1 + step)` inside the varied k-bin, where
-    `step = sign * frac_step` and the sign is inferred by comparing the
-    perturbed bin amplitude recorded in `camb_params._primordial_pk` to the
-    fiducial power law at the bin center.
+    The fiducial power law (`As`, `ns`, and the pivot scale) is read from
+    `camb_params.InitPower`. The tabulated spectrum is passed to CAMB even
+    when no bin is varied, so that the fiducial and the varied spectra are
+    calculated the same way.
 
     Parameters
     ----------
     camb_params : camb.model.CAMBparams
-        The CAMB parameters carrying the (possibly perturbed) bin
-        amplitudes in the private `_primordial_pk` attribute, as returned
-        by `set_camb_params` with `binned_pk=True`.
-    camb_params_cdm : camb.model.CAMBparams
-        The CAMB parameters carrying the fiducial power-law attributes
-        `_fid_As`, `_fid_ns`, and `_fid_kpivot`, used both to define the
-        fiducial power law and as the base for the perturbed CAMB run.
-    bin_edges : array_like of float
-        The k-bin edges: element `i` is the lower edge of bin `i`, and
-        element `i + 1` is its upper edge.
-    varied_param : str or None, default='fid'
-        The name of the varied bin amplitude (`'Pk<n>'` or
-        `'eneg2tauPk<n>'`, 1-indexed), or `'fid'`/`None` for the fiducial
-        (no bin varied).
-    frac_step : float, default=0.05
-        The fractional step applied inside the varied bin. NOTE: this must
-        be consistent with the step sizes in the Fisher steps file, since
-        the finite-difference denominator comes from the steps file while
-        the spectra are perturbed by `frac_step`. A warning is issued if
-        the fractional step implied by the perturbed bin amplitude differs
-        from `frac_step` by more than 0.1 percent (relative).
+        The CAMB parameters with the fiducial power-law primordial spectrum.
+    bin_edges : array_like of float, default=None
+        The k bin edges in Mpc^-1: element `i` is the lower edge of bin `i`
+        and element `i + 1` its upper edge. Only needed if a bin is varied.
+    varied_bin : int, default=None
+        The index of the bin to scale, counting from zero, or `None` to
+        leave the power law as it is.
+    step : float, default=0.0
+        The fractional change of the power inside the varied bin.
+    effective_ns : float, default=None
+        The spectral index CAMB uses for the non-linear correction. By
+        default, the `ns` of the power law.
 
     Returns
     -------
-    camb_results : camb.results.CAMBdata
-        The CAMB results for the perturbed (or fiducial) primordial
-        spectrum.
-    pk_transfer_function : callable(k, z) or None
-        The transfer function to apply to the fiducial primordial spectrum,
-        or `None` for the fiducial case.
+    pars : camb.model.CAMBparams
+        The CAMB parameters with the tabulated primordial spectrum.
+    pk_transfer_function : callable or None
+        A function of (k, z) that returns the factor applied to the power
+        law, for use with `hd_pk.cmb_from_pk.calculate_clkk`, or `None` if
+        no bin is varied.
     """
-    pk_bins_arr = np.array(camb_params._primordial_pk['Pk'])
-    k_bins_arr = np.array(camb_params._primordial_pk['k'])
-    As = camb_params_cdm._fid_As
-    ns = camb_params_cdm._fid_ns
-    k_pivot = camb_params_cdm._fid_kpivot
-
-    step_size = 0.0
-    varied_bin_idx = None
-    if varied_param not in (None, 'fid'):
-        match = re.match(r'^(?:Pk|eneg2tauPk)(\d+)$', varied_param)
-        if match is not None:
-            bin_num = int(match.group(1)) - 1
-            pk_fid_at_bin = As * (k_bins_arr[bin_num] / k_pivot) ** (ns - 1)
-            sign = 1.0 if pk_bins_arr[bin_num] >= pk_fid_at_bin else -1.0
-            step_size = sign * frac_step
-            varied_bin_idx = bin_num
-            # consistency check: the spectra are perturbed by `frac_step`,
-            # but the finite-difference denominator in the Fisher derivative
-            # comes from the steps file (via the perturbed bin amplitude).
-            # If the two disagree, the derivatives are silently wrong by
-            # their ratio, so warn loudly:
-            implied_frac = (pk_bins_arr[bin_num] - pk_fid_at_bin) / pk_fid_at_bin
-            if abs(abs(implied_frac) - frac_step) > 1e-3 * frac_step:
-                msg = (f"The perturbed amplitude of bin {bin_num + 1} implies "
-                       f"a fractional step of {implied_frac:+.6f}, but the "
-                       f"spectra will be perturbed by frac_step = "
-                       f"{step_size:+.6f}. The Fisher derivative for "
-                       f"'{varied_param}' will be wrong by the ratio of the "
-                       "two. Make `frac_step` (the `pk_frac_step` argument "
-                       "of `hdinitpk.hdinitPkfisher.Fisher`) consistent with the "
-                       "step sizes in the Fisher steps file.")
-                warnings.warn(msg)
-
-    if varied_bin_idx is not None and abs(step_size) > 0:
-        kmin = bin_edges[varied_bin_idx]
-        kmax = bin_edges[varied_bin_idx + 1]
+    As = camb_params.InitPower.As
+    ns = camb_params.InitPower.ns
+    k_pivot = camb_params.InitPower.pivot_scalar
+    if effective_ns is None:
+        effective_ns = ns
+    k_fine = np.logspace(-6, 2, 10000)
+    pk_fine = As * (k_fine / k_pivot)**(ns - 1)
+    pk_transfer_function = None
+    if varied_bin is not None:
+        kmin = bin_edges[varied_bin]
+        kmax = bin_edges[varied_bin + 1]
 
         def pk_transfer_function(k, z):
             k = np.atleast_1d(np.asarray(k, dtype=float))
-            result = np.ones_like(k)
-            in_bin = (k >= kmin) & (k <= kmax)
-            result[in_bin] = 1.0 + step_size
-            return result
+            factor = np.ones_like(k)
+            factor[(k >= kmin) & (k <= kmax)] = 1 + step
+            return factor
 
-        k_fine = np.logspace(np.log10(1e-6), np.log10(100), 10000)
-        pk_fine = As * (k_fine / k_pivot) ** (ns - 1) * pk_transfer_function(k_fine, None)
-        Pk_func = interp1d(k_fine, pk_fine, kind='linear', bounds_error=False,
-                           fill_value=(pk_fine[0], pk_fine[-1]))
-        camb_params_binned = camb_params_cdm.copy()
-        camb_params_binned.set_initial_power_function(
-            Pk_func, effective_ns_for_nonlinear=ns, kmin=1e-6, kmax=100)
-        camb_results = camb.get_results(camb_params_binned)
-    else:
-        pk_transfer_function = None
-        camb_results = camb.get_results(camb_params_cdm)
-
-    return camb_results, pk_transfer_function
+        pk_fine = pk_fine * pk_transfer_function(k_fine, None)
+    pk_func = interp1d(k_fine, pk_fine, kind='linear', bounds_error=False,
+                       fill_value=(pk_fine[0], pk_fine[-1]))
+    pars = camb_params.copy()
+    pars.set_initial_power_function(pk_func, effective_ns_for_nonlinear=effective_ns,
+                                    kmin=1e-6, kmax=100)
+    return pars, pk_transfer_function
 
 
-# ----- the Theory subclass: -----
+def binned_pk_spectra(lmax, camb_results, clkk, cmb_types=['lensed', 'unlensed'],
+                      nlkk=None, Lmin=None, Lmax=None):
+    """The CMB spectra for a binned primordial power spectrum, given the
+    CAMB results for that spectrum and its lensing power spectrum. This
+    follows `hd_pk.cmb_from_pk.calculate_theory_spectra`.
+
+    Parameters
+    ----------
+    lmax : int
+        The maximum multipole of the returned spectra.
+    camb_results : camb.results.CAMBdata
+        The CAMB results for the binned primordial spectrum.
+    clkk : array_like of float
+        The lensing convergence power spectrum for the binned primordial
+        spectrum, C_L^kk = [L(L+1)]^2 C_L^phiphi / 4, from L = 0 to at
+        least the maximum multipole CAMB calculated.
+    cmb_types : list of str, default=['lensed', 'unlensed']
+        Any of `'lensed'`, `'unlensed'`, and `'delensed'`.
+    nlkk : array_like of float, default=None
+        The lensing reconstruction noise, needed for the delensed spectra.
+    Lmin, Lmax : int, default=None
+        The multipole range of the lensing reconstruction, needed for the
+        delensed spectra.
+
+    Returns
+    -------
+    theo : dict of dict of array_like of float
+        The spectra for each requested CMB type, with keys `'ells'`,
+        `'tt'`, `'te'`, `'ee'`, `'bb'`, and `'kk'`, starting at ell = 0.
+        The CMB spectra are C_ell's in uK^2.
+    """
+    ells = np.arange(lmax + 1)
+    theo = {}
+    for cmb_type in cmb_types:
+        if cmb_type == 'delensed':
+            cl = hdtheory.get_residual_lensing(clkk, nlkk, Lmin, Lmax, len(clkk) - 1)
+        elif cmb_type == 'unlensed':
+            cl = np.zeros_like(clkk)
+        else:
+            cl = clkk
+        cls = camb_results.get_lensed_cls_with_spectrum(
+            cl * 4 / (2 * np.pi), lmax=lmax, CMB_unit='muK', raw_cl=True)
+        theo[cmb_type] = {'ells': ells.copy(), 'kk': clkk[:lmax+1].copy()}
+        for i, s in enumerate(CAMB_SPECTRA):
+            theo[cmb_type][s] = cls[:, i].copy()
+    return theo
+
+
+# ----- the Theory class -----
 
 class Theory(hdtheory.Theory):
-    """Extends `hdfisher.theory.Theory` with the binned primordial power
-    spectrum and the kSZ template. Accepts the same arguments as the base
-    class, plus the following (matching the merged hdfisher code):
+    """Calculate the CMB and lensing power spectra and the BAO theory, with
+    the option of a binned primordial power spectrum and a kSZ template.
+
+    This takes the same arguments as `hdfisher.theory.Theory`, plus the
+    ones below. Without them it does exactly what hdfisher does.
 
     Parameters
     ----------
     binned_pk : bool, default=False
-        If `True`, the primordial power spectrum is described by an
-        amplitude in each of a set of k-bins rather than by a power law.
-        The `param_file` must then contain an `nkbins` entry, the bin
-        centers (`k1`, `k2`, ...), the bin amplitudes (`Pk1`, `Pk2`, ...
-        or `eneg2tauPk1`, ...), and an `effective_ns_for_nonlinear` entry.
-        Requires `bin_edges`, and requires `use_class=False`. The spectra
-        are calculated with `hd_pk.cmb_from_pk`.
-    varied_param : str or None, default='fid'
-        The name of the parameter that is being varied away from its
-        fiducial value. Used by the binned-Pk calculation to work out which
-        k-bin is being stepped, and in which direction. Pass `'fid'` or
-        `None` for the fiducial theory. Ignored when `binned_pk=False`.
+        If `True`, the primordial power spectrum is a set of amplitudes in
+        k bins instead of a power law. The `param_file` must then give the
+        fiducial power law (`logA` or `As`, and `ns`), the number of bins
+        (`nkbins`), the bin centers (`k1`, `k2`, ...), the bin amplitudes
+        (`Pk1`, `Pk2`, ... or `eneg2tauPk1`, ...), and
+        `effective_ns_for_nonlinear`. Requires `bin_edges`, and only works
+        with CAMB.
+    bin_edges : str or array_like of float, default=None
+        The k bin edges in Mpc^-1, either as an array or as the name of a
+        text file that `numpy.loadtxt` can read. Needed when
+        `binned_pk=True`.
     ksz : bool, default=False
-        If `True`, add a kinematic SZ template to the theory TT spectrum.
-        The amplitude `A_ksz` and tilt `n_ksz` must then be provided in
-        `cosmo_params` (they are removed before anything is passed to the
-        Boltzmann code). For CAMB, the template is added to every requested
-        CMB type; for CLASS, it is added to the lensed spectra only.
-    bin_edges : str, array_like of float, or None, default=None
-        The k-bin edges used when `binned_pk=True`, given either as an
-        array or as the name (including the absolute path) of a text file
-        that can be read with `numpy.loadtxt`. Required when
-        `binned_pk=True`, and ignored otherwise.
+        If `True`, add the kSZ template to the theory TT spectrum. Its
+        amplitude `A_ksz` and tilt `n_ksz` are taken from `cosmo_params`
+        if given there, and from the `param_file` otherwise.
     pk_frac_step : float, default=0.05
-        The fractional step applied inside the varied k-bin; see
-        `build_binned_pk_transfer`.
+        The fraction by which the power inside a k bin is changed when the
+        amplitude of that bin is varied. This must match the relative step
+        size given for the bin amplitudes in the Fisher step-size file,
+        since the finite difference divides by that step. A warning is
+        issued if the two disagree.
 
-    Raises
-    ------
-    ValueError
-        If `ksz=True` but `A_ksz` or `n_ksz` was not provided; if
-        `binned_pk=True` but no `bin_edges` were given; or if both
-        `use_class=True` and `binned_pk=True`.
-    NotImplementedError
-        If delensed spectra are requested with both `binned_pk=True` and
-        `ksz=True`.
+    Notes
+    -----
+    When a bin amplitude `Pk<n>` is passed in `cosmo_params` with a value
+    different from its fiducial value, the power inside bin `n` is scaled
+    by `1 + pk_frac_step` (or `1 - pk_frac_step`, if the value is below
+    the fiducial one). The spectra are then calculated with CAMB and
+    `hd_pk`, following MacInnis & Sehgal (2024).
+
+    The parameter file's maximum multipole is not used; the spectra are
+    calculated to `lmax + LMAX_BUFFER` and kept to `lmax`.
     """
 
     def __init__(self, lmax, output_dir, output_root=None, param_file=None,
                  nlkk=None, recon_lmin=None, recon_lmax=None, use_H0=False,
-                 use_class=False, binned_pk=False, varied_param='fid',
-                 ksz=False, bin_edges=None, pk_frac_step=0.05, **cosmo_params):
-        self.binned_pk = binned_pk # whether or not you are using binned pk
-        self.varied_param = varied_param
+                 use_class=False, binned_pk=False, bin_edges=None, ksz=False,
+                 pk_frac_step=0.05, **cosmo_params):
+        self.binned_pk = binned_pk
         self.pk_frac_step = pk_frac_step
-
+        if isinstance(bin_edges, str):
+            bin_edges = np.loadtxt(bin_edges)
+        self.bin_edges = None if (bin_edges is None) else np.asarray(bin_edges, dtype=float)
+        # the fiducial values, used for the kSZ template and to tell which
+        # way a bin amplitude has been varied:
+        self.fid_params = hdtheory.get_params(param_file=param_file)
         self.ksz = ksz
-        self.A_ksz = cosmo_params.pop('A_ksz', None)
-        self.n_ksz = cosmo_params.pop('n_ksz', None)
-        if self.ksz and (self.A_ksz is None or self.n_ksz is None):
-            raise ValueError("Must provide `A_ksz` and `n_ksz` when `ksz=True`")
-        if use_class and binned_pk:
-            err_msg = "`use_class=True` and `binned_pk=True` cannot be combined: the binned primordial power spectrum is only implemented for CAMB. Set one of them to `False`."
-            raise ValueError(err_msg)
-
-        self.bin_edges = None
-        if bin_edges is not None:
-            self.bin_edges = np.loadtxt(bin_edges) if isinstance(bin_edges, str) else np.asarray(bin_edges)
-        if self.binned_pk and self.bin_edges is None:
-            raise ValueError("You must pass `bin_edges` (an array or a file path) when `binned_pk=True`.")
-
-        # the base `__init__` calls the `_setup_boltzmann_params` override
-        # below, which reads `self.binned_pk`, so the attributes above must
-        # be set first:
+        self.A_ksz = cosmo_params.pop('A_ksz', self.fid_params.get('A_ksz'))
+        self.n_ksz = cosmo_params.pop('n_ksz', self.fid_params.get('n_ksz'))
+        # the CAMB results and lensing spectrum for the binned P(k), filled
+        # in the first time they are needed:
+        self._binned_pk_results = None
+        # the base class sets up the Boltzmann code parameters through
+        # `_setup_boltzmann_params` below, which uses the attributes above
         super().__init__(lmax, output_dir, output_root=output_root,
                          param_file=param_file, nlkk=nlkk,
                          recon_lmin=recon_lmin, recon_lmax=recon_lmax,
@@ -428,84 +292,143 @@ class Theory(hdtheory.Theory):
 
 
     def _setup_boltzmann_params(self, param_file=None, use_H0=False, **cosmo_params):
-        """Set up the Boltzmann-code parameters, using this module's
-        `set_camb_params` (which understands the binned-Pk and kSZ
-        parameter-file entries) instead of hdfisher's.
-
-        When `binned_pk=True`, a second `CAMBparams` instance
-        (`self.camb_params_cdm`) is set up carrying the fiducial power law,
-        used by `build_binned_pk_transfer` as the base for the perturbed
-        CAMB run.
-        """
+        """Set up `self.camb_params` or `self.class_params`. For a binned
+        P(k), also work out which bin (if any) is varied, and in which
+        direction."""
         if self.use_class:
-            # the kSZ parameters were already removed from `cosmo_params` in
-            # `__init__`, so the base CLASS setup can be used directly:
-            super()._setup_boltzmann_params(param_file=param_file,
-                                            use_H0=use_H0, **cosmo_params)
-        else:
-            self.class_params = None
-            self.camb_params = set_camb_params(
-                self.lmax, param_file=param_file, use_H0=use_H0,
-                binned_pk=self.binned_pk, **cosmo_params)
             if self.binned_pk:
-                self.camb_params_cdm = set_camb_params(
-                    self.lmax, param_file=param_file, use_H0=use_H0,
-                    binned_pk=self.binned_pk, **cosmo_params)
+                raise ValueError("The binned P(k) is only calculated with CAMB; set `use_class=False`.")
+            self.camb_params = None
+            # CLASS reads the BBN table itself, so it needs the full path
+            cosmo_params.setdefault('sBBN file', hd_data.HDMockData().class_sbbn_file)
+            self.class_params = hdtheory.set_class_params(
+                self.lmax, param_file=param_file, use_H0=use_H0, **cosmo_params)
+            self.class_params['l_max_scalars'] = self.lmax + LMAX_BUFFER
+            return
+        self.class_params = None
+        self.camb_params = set_camb_params(self.lmax, param_file=param_file,
+                                           use_H0=use_H0, **cosmo_params)
+        self.varied_bin = None
+        self.pk_step = 0.0
+        if not self.binned_pk:
+            return
+        for name, value in cosmo_params.items():
+            match = BIN_PARAM.match(name)
+            if (match is None) or (match.group(1) == 'k'):
+                continue
+            self.varied_bin = int(match.group(2)) - 1
+            fid = self.fid_params[name]
+            self.pk_step = self.pk_frac_step if (value >= fid) else -self.pk_frac_step
+            # the finite difference in the Fisher derivative divides by the
+            # step in the step-size file, so the two steps must agree
+            implied_step = abs(value / fid - 1)
+            if abs(implied_step - self.pk_frac_step) > 1e-3 * self.pk_frac_step:
+                msg = (f"The value of {name} is {implied_step:.6f} of its fiducial value away from it, but the power in that bin is changed by pk_frac_step = {self.pk_frac_step}. The derivative with respect to {name} will be off by the ratio of the two. Set pk_frac_step to the relative step size of the bin amplitudes in the step-size file.")
+                warnings.warn(msg)
+
+
+    def get_binned_pk_results(self):
+        """The CAMB results and the lensing power spectrum for the binned
+        primordial spectrum, calculated once and kept."""
+        if self._binned_pk_results is None:
+            effective_ns = self.fid_params.get('effective_ns_for_nonlinear')
+            pars_fid, _ = binned_pk_camb_params(self.camb_params, effective_ns=effective_ns)
+            if self.varied_bin is None:
+                pars, pk_transfer_function = pars_fid, None
             else:
-                self.camb_params_cdm = None
+                pars, pk_transfer_function = binned_pk_camb_params(
+                    self.camb_params, bin_edges=self.bin_edges,
+                    varied_bin=self.varied_bin, step=self.pk_step,
+                    effective_ns=effective_ns)
+            results = camb.get_results(pars)
+            clkk = cmb_from_pk.calculate_clkk(pars_fid, pk_transfer_function=pk_transfer_function)
+            self._binned_pk_results = (results, clkk)
+        return self._binned_pk_results
 
 
-    def _get_cl_ksz(self):
-        """Returns the scaled kSZ template up to `self.lmax`."""
-        return get_cl_ksz(self.lmax, self.A_ksz, self.n_ksz)
-
-
-    def _compute_spectra(self, cmb_type, save=False):
-        """Compute the (lensed or unlensed) theory spectra for a single
-        `cmb_type`, using `hd_pk.cmb_from_pk` when `binned_pk=True`, and
-        adding the kSZ template to TT when `ksz=True`.
-        """
+    def calculate_spectra(self, cmb_types):
+        """Calculate the theory spectra for the requested `cmb_types`
+        (`'lensed'`, `'unlensed'`, and/or `'delensed'`): with `hd_pk` for a
+        binned P(k), and with hdfisher otherwise. The kSZ template is added
+        to TT if `ksz=True`."""
         if self.binned_pk:
-            cmb_from_pk = _import_cmb_from_pk()
-            camb_results_binned, pk_transfer_function = build_binned_pk_transfer(
-                self.camb_params, self.camb_params_cdm, self.bin_edges,
-                varied_param=self.varied_param, frac_step=self.pk_frac_step)
-            theo = cmb_from_pk.calculate_theory_spectra(
-                self.lmax, self.camb_params_cdm,
-                camb_results=camb_results_binned,
-                pk_transfer_function=pk_transfer_function,
-                cmb_types=[cmb_type])[cmb_type]
-            if self.ksz:
-                theo['tt'] += self._get_cl_ksz()
-            return theo
-        theo = super()._compute_spectra(cmb_type, save=save)
+            results, clkk = self.get_binned_pk_results()
+            theo = binned_pk_spectra(self.lmax, results, clkk, cmb_types=cmb_types,
+                                     nlkk=self.nlkk, Lmin=self.Lmin, Lmax=self.Lmax)
+        else:
+            # hdfisher's own calculation, with CAMB or CLASS, done fresh
+            theo = {}
+            if ('lensed' in cmb_types) or ('unlensed' in cmb_types):
+                theo.update(super().get_theory_spectra(overwrite=True, save=False))
+            if 'delensed' in cmb_types:
+                theo['delensed'] = super().get_delensed_spectra(overwrite=True, save=False)
+            theo = {cmb_type: theo[cmb_type] for cmb_type in cmb_types}
         if self.ksz:
-            # for CAMB, the template is added to every requested CMB type;
-            # for CLASS, only to the lensed spectra (matching the merged
-            # hdfisher behavior):
-            if (not self.use_class) or (cmb_type == 'lensed'):
-                theo['tt'] += self._get_cl_ksz()
+            cl_ksz = get_cl_ksz(self.lmax, self.A_ksz, self.n_ksz)
+            for cmb_type in theo:
+                theo[cmb_type]['tt'] = theo[cmb_type]['tt'] + cl_ksz
         return theo
 
 
-    def _compute_delensed_spectra(self, save=False):
-        """Compute the delensed theory spectra, using `hd_pk.cmb_from_pk`
-        when `binned_pk=True`.
+    def _stored_spectra(self, cmb_type, overwrite=False):
+        """The spectra for one `cmb_type` from memory or from the file in
+        `output_dir`, or `None` if they have to be calculated."""
+        if overwrite:
+            return None
+        if all(s in self.theo[cmb_type] for s in config.theo_cols):
+            return self.theo[cmb_type].copy()
+        fname = self.theo_fnames[cmb_type]
+        if os.path.exists(fname):
+            print(f'loading {cmb_type} theory from {fname}')
+            return utils.load_from_file(fname, config.theo_cols)
+        return None
+
+
+    def get_theory_spectra(self, overwrite=False, save=False):
+        """The lensed and unlensed CMB spectra and the lensing spectrum.
+
+        For a power-law P(k) without the kSZ template this is hdfisher's
+        method. Otherwise it does the same loading and saving, with the
+        spectra calculated by `calculate_spectra`.
         """
-        if self.binned_pk:
-            cmb_from_pk = _import_cmb_from_pk()
-            camb_results, pk_transfer_function = build_binned_pk_transfer(
-                self.camb_params, self.camb_params_cdm, self.bin_edges,
-                varied_param=self.varied_param, frac_step=self.pk_frac_step)
-            theo = cmb_from_pk.calculate_theory_spectra(
-                self.lmax, self.camb_params_cdm,
-                camb_results=camb_results,
-                pk_transfer_function=pk_transfer_function,
-                cmb_types=['delensed'],
-                nlkk=self.nlkk, recon_lmin=self.Lmin, recon_lmax=self.Lmax)
-            delensed_theo = theo['delensed']
-        else:
-            delensed_theo = super()._compute_delensed_spectra(save=save)
-        if self.ksz:
-            delensed_theo['tt'] += self._get_cl_ksz()
-        return delensed_theo
+        if not (self.binned_pk or self.ksz):
+            return super().get_theory_spectra(overwrite=overwrite, save=save)
+        theo = {}
+        to_calculate = []
+        for cmb_type in ['lensed', 'unlensed']:
+            stored = self._stored_spectra(cmb_type, overwrite=overwrite)
+            if stored is None:
+                to_calculate.append(cmb_type)
+            else:
+                theo[cmb_type] = stored
+        if to_calculate:
+            theo.update(self.calculate_spectra(to_calculate))
+        for cmb_type in ['lensed', 'unlensed']:
+            if save:
+                fname = self.theo_fnames[cmb_type]
+                print(f'saving {cmb_type} theory to {fname}')
+                utils.save_to_file(fname, theo[cmb_type], keys=config.theo_cols)
+            self.theo[cmb_type] = theo[cmb_type].copy()
+        return theo
+
+
+    def get_delensed_spectra(self, save=False, overwrite=False):
+        """The delensed CMB spectra and the lensing spectrum, given the
+        lensing reconstruction noise passed at initialization.
+
+        For a power-law P(k) without the kSZ template this is hdfisher's
+        method. Otherwise it does the same loading and saving, with the
+        spectra calculated by `calculate_spectra`.
+        """
+        if not (self.binned_pk or self.ksz):
+            return super().get_delensed_spectra(save=save, overwrite=overwrite)
+        delensed = self._stored_spectra('delensed', overwrite=overwrite)
+        if delensed is None:
+            self.check_delensing_vars()
+            delensed = self.calculate_spectra(['delensed'])['delensed']
+        if save:
+            fname = self.theo_fnames['delensed']
+            print(f'saving delensed theory to {fname}')
+            utils.save_to_file(fname, delensed, keys=config.theo_cols)
+        self.theo['delensed'] = delensed.copy()
+        return delensed

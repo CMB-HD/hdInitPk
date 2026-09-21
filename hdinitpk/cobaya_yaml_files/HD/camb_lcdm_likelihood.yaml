@@ -10,10 +10,9 @@
 #                            these runs read as proposal covariances and
 #                            the ones they write. Too large to distribute.
 #
-# The proposal matrices and the CLASS sBBN table
-# (`PRIMAT21_class_format.dat`) ship with the package, under
-# `hdinitpk/data/proposal_matrices/` and `hdinitpk/data/class_inputs/`, so
-# they resolve under `/path/to/hdInitPk`.
+# The proposal matrices ship with the package, under
+# `hdinitpk/data/proposal_matrices/`, so they resolve under
+# `/path/to/hdInitPk`.
 #
 # `output:` is where this run WRITES its chains; the rest are inputs.
 # ----------------------------------------------------------------------

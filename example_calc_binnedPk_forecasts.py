@@ -36,8 +36,7 @@ from hdinitpk import hdinitPkfisher
 
 # Where the derivatives go. They land under
 # `hdinitpk/data/user_generated_data/fisher_derivs`, alongside everything
-# else this repository generates; set HDINITPK_USER_DATA to move that
-# somewhere else, if you prefer.
+# else this repository generates.
 fisher_dir = hdinitpk.user_data_path('fisher_derivs', 'so_binned_pk')
 
 # The fiducial parameters and the step sizes ship with the package, in
@@ -62,14 +61,13 @@ k_bins = np.loadtxt(
 bin_edges = np.append(k_bins[:, 0], k_bins[-1, 1])
 
 # The one thing that is easy to get wrong: `pk_frac_step` is the fraction
-# by which the spectrum inside the varied bin is perturbed, while the
+# by which the spectrum inside the varied bin is changed, while the
 # denominator of the finite difference comes from the step given for
 # `Pk<n>` in the steps file. The two MUST agree, so this 0.05 goes with
-# the `..._5_percent.yaml` above. (A mismatch raises a warning from
-# `hdinitpk.theory.build_binned_pk_transfer` rather than an error, and the
-# derivatives come out wrong) Rerunning
-# with the 1% and 10% steps files (and 0.01 and 0.10 here) is how the
-# derivatives in the paper were checked for convergence.
+# the `..._5_percent.yaml` above. (A mismatch gives a warning from
+# `hdinitpk.theory.Theory` rather than an error, and the derivatives come
+# out wrong.) Rerunning with the 1% and 10% steps files (and 0.01 and 0.10
+# here) is how the derivatives in the paper were checked for convergence.
 pk_frac_step = 0.05
 
 fisherlib = hdinitPkfisher.Fisher(
@@ -78,7 +76,8 @@ fisherlib = hdinitPkfisher.Fisher(
     exp='so',                 # SO-like noise and sky coverage
     use_H0=True,              # marginalize over H0 rather than theta
     use_class=False,          # binned P(k) goes through CAMB and hd_pk
-    hd_data_version='v1.2',   # the mock data version, from hdMockData
+    hd_data_version='v1.2',   # the mock data version, from hdMockData,
+                              #  which also sets the lmax of the theory
     binned_pk=True,
     bin_edges=bin_edges,
     pk_frac_step=pk_frac_step,
@@ -94,7 +93,7 @@ fisherlib = hdinitPkfisher.Fisher(
 fisherlib.calculate_fisher_derivs()
 mpi.comm.barrier()
 
-# Fisher matrices, which are comparively fast to make. `get_fisher` assembles the matrix from the
+# Fisher matrices, which are comparatively fast to make. `get_fisher` assembles the matrix from the
 # derivatives and the covariance, and returns it together with the list of
 # parameters it is indexed by. The paper's SO forecast keeps the first
 # seven bin amplitudes and marginalizes over the background parameters;

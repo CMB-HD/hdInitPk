@@ -16,6 +16,10 @@ wa: 0.0
 
 # non-linear model:
 halofit_version: 'mead2016'
+# BBN table and recombination model. These are the CAMB 1.5.9 defaults,
+# written out to match the CAMB settings in hdMockData.
+bbn_predictor: 'PRIMAT_Yp_DH_ErrorMC_2021.dat'
+recombination_model: 'Recfast'
 # accuracy parameters:
 NonLinear: NonLinear_both
 AccuracyBoost: 1.1
@@ -28,4 +32,5 @@ DoLateRadTruncation: False
 lens_margin: 2050
 lens_potential_accuracy: 30
 dark_energy_model: 'ppf'
-lmax: 24000
+# The maximum multipole is not set here. The theory is calculated to the
+# lmax of the CMB-HD mock data in hdMockData (24,000 for v1.2).

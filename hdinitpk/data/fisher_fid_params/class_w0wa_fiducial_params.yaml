@@ -16,29 +16,21 @@ H0: 67.36
 
 # ----- neutrinos -----
 #
-# `sum_m_ncdm` is a convenience key handled by `theory.set_class_params`, not a
-# CLASS parameter. It holds the SUM of the neutrino masses; the sum is split
-# evenly over the massive species and written into `m_ncdm` before CLASS sees
-# it, then removed.
-#
-# This exists because CLASS wants `m_ncdm` as a comma-separated per-species
-# string, which the Fisher machinery cannot step (it does float arithmetic on
-# the fiducial value). Varying the sum reproduces the old `mnu` behaviour
-# exactly: sum_m_ncdm: 0.06 with N_ncdm: 3 builds '0.02,0.02,0.02', the same
-# string the old CAMB-to-CLASS translation produced from mnu: 0.06.
-#
-# Give `sum_m_ncdm` OR `m_ncdm`, never both. Write `m_ncdm` directly only if
-# you do not need to vary the mass.
+# `sum_m_ncdm` is the total neutrino mass, the same quantity as CAMB's `mnu`.
+# It is not a CLASS parameter: `hdfisher.theory.set_class_params` splits it
+# evenly over the `N_ncdm` massive species and passes CLASS `m_ncdm`. This is
+# what lets the Fisher code vary the total mass, since CLASS wants `m_ncdm`
+# as a comma-separated string. `Neff` is handled the same way and becomes
+# CLASS's `N_ur`. Give `sum_m_ncdm` or `m_ncdm`, and `Neff` or `N_ur`, not
+# both.
 N_ncdm: 3
 sum_m_ncdm: 0.06
-# m_ncdm: '0.02, 0.02, 0.02'   # CLASS-native form; cannot be varied
-
 Neff: 3.044
 
 
 
-# ----- maximum multipole -----
-l_max_scalars: 24000
+# The maximum multipole is not set here. The theory is calculated to the
+# lmax of the CMB-HD mock data in hdMockData (24,000 for v1.2).
 
 
 # ----- dark energy -----
@@ -76,17 +68,9 @@ recombination: 'recfast'
 YHe: 'BBN'
 T_cmb: 2.7255
 
-# CLASS opens this file itself, so it needs an ABSOLUTE path and cannot be
-# given one resolved through `hdinitpk.data_path`. The table ships with the
-# package, at
-#     <this repository>/hdinitpk/data/class_inputs/PRIMAT21_class_format.dat
-# `run_hdInitPk_forecasts.py` and `run_hdInitPk_forecasts.ipynb`
-# rewrite the `/path/to/hdInitPk` placeholder below to the installed package
-# and pass CLASS the rewritten copy, so there is nothing to edit for those.
-# Anything else that reads this file directly must substitute it, or CLASS
-# aborts with "could not open fA with name /path/to/hdInitPk/...".
-# (It was `/gpfs/home/zcheslog/cmb_hd/PRIMAT21_class_format.dat` on SeaWulf.)
-sBBN file: '/path/to/hdInitPk/hdinitpk/data/class_inputs/PRIMAT21_class_format.dat'
+# The BBN table (`sBBN file`) is the PRIMAT 2021 table provided with
+# hdMockData. `hdinitpk.theory.Theory` fills in its path, since CLASS
+# reads the file itself and needs the full path.
 
 
 # ----- accuracy settings -----
