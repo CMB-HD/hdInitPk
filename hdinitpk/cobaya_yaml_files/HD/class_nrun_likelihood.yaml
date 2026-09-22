@@ -52,7 +52,7 @@ likelihood:
   ##      Note that in the test python script `test_hdlike_cobaya.py`,
   ##      the absolute paths are found and passed to Cobaya.
   bao.generic:
-    measurements_file: /path/to/hdlike/hdlike/data/mock_desi_bao_rs_over_DV_data.txt
+    measurements_file: /path/to/hdlike/hdlike/data/class_mock_desi_bao_rs_over_DV_data.txt
     cov_file: /path/to/hdlike/hdlike/data/mock_desi_bao_rs_over_DV_cov.txt
 
 ### CAMB settings
