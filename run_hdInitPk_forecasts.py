@@ -126,11 +126,12 @@ ext_model_params = {
 
 # The CLASS parameter files use CLASS names, so parameter lists and priors
 # are translated on the way in. The matrices are saved with CLASS names,
-# and the plotting notebook translates them back.
+# and the plotting notebook translates them back. N_eff is varied through
+# `N_ur`, the number of massless neutrinos, which CLASS takes directly.
 camb_to_class = {
     'ombh2': 'omega_b',   'omch2': 'omega_cdm',  'theta': 'theta_s_100',
     'tau': 'tau_reio',    'logA': 'ln_A_s_1e10', 'As': 'A_s',
-    'ns': 'n_s',          'H0': 'H0',            'nnu': 'Neff',
+    'ns': 'n_s',          'H0': 'H0',            'nnu': 'N_ur',
     'mnu': 'sum_m_ncdm',  'nrun': 'alpha_s',     'omk': 'Omega_k',
     'w': 'w0_fld',        'wa': 'wa_fld',
     'HMCode_logT_AGN': 'log10T_heat_hmcode',
@@ -156,7 +157,7 @@ JOBS = {
     'class': {
         'dirname': 'class_9param',
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=True,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='class',
             fisher_steps_file=steps('class_fiducial_step_sizes.yaml'),
             param_file=params('class_fiducial_params.yaml')),
     },
@@ -166,7 +167,7 @@ JOBS = {
     'so': {
         'dirname': 'so_9param',
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=True, exp='so',
+            overwrite=True, use_H0=use_H0, use_class_or_camb='class', exp='so',
             fisher_steps_file=steps('class_fiducial_step_sizes.yaml'),
             param_file=params('class_fiducial_params.yaml')),
     },
@@ -176,7 +177,7 @@ JOBS = {
     'camb': {
         'dirname': 'camb_9param',
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb',
             fisher_steps_file=steps('camb_fiducial_step_sizes.yaml'),
             param_file=params('camb_fiducial_params.yaml')),
     },
@@ -186,7 +187,7 @@ JOBS = {
     'camb_feedback_ksz': {
         'dirname': 'camb_feedback_ksz',
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False, ksz=True,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb', ksz=True,
             fisher_steps_file=steps('camb_fiducial_step_sizes_feedback_ksz.yaml'),
             param_file=params('camb_fiducial_params_feedback.yaml')),
     },
@@ -196,7 +197,7 @@ JOBS = {
     'w0wa_hd': {
         'dirname': 'hd_w0wa',
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb',
             fisher_steps_file=steps('camb_w0wa_fiducial_step_sizes.yaml'),
             param_file=params('camb_w0wa_fiducial_params.yaml')),
     },
@@ -204,7 +205,7 @@ JOBS = {
     'w0wa_so': {
         'dirname': 'so_w0wa',
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False, exp='so',
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb', exp='so',
             fisher_steps_file=steps('camb_w0wa_fiducial_step_sizes.yaml'),
             param_file=params('camb_w0wa_fiducial_params.yaml')),
     },
@@ -213,7 +214,7 @@ JOBS = {
     'binned_pk_hd': {
         'dirname': 'hd_binned_pk',
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb',
             binned_pk=True, bin_edges=PK_BIN_EDGES, pk_frac_step=PK_FRAC_STEP,
             fisher_steps_file=steps('binned_pk_steps_5_percent.yaml'),
             param_file=params('hd_binned_pk_fiducial_params.yaml')),
@@ -222,7 +223,7 @@ JOBS = {
     'binned_pk_so': {
         'dirname': 'so_binned_pk',
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False, exp='so',
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb', exp='so',
             binned_pk=True, bin_edges=PK_BIN_EDGES, pk_frac_step=PK_FRAC_STEP,
             fisher_steps_file=steps('binned_pk_steps_5_percent.yaml'),
             param_file=params('hd_binned_pk_fiducial_params.yaml')),
@@ -231,7 +232,7 @@ JOBS = {
     'binned_pk_hd_feedback': {
         'dirname': 'hd_binned_pk_feedback',
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb',
             binned_pk=True, ksz=True, bin_edges=PK_BIN_EDGES,
             pk_frac_step=PK_FRAC_STEP,
             fisher_steps_file=steps('binned_pk_steps_5_percent_feedback.yaml'),
@@ -364,7 +365,15 @@ def reference_errors(name):
 
 def build_matrices():
     """Build the matrices, save them, and print the largest fractional
-    difference between each one's errors and the shipped matrix."""
+    difference between each one's errors and the shipped matrix.
+
+    Every rank builds the matrices, because setting up a `Fisher` has MPI
+    barriers in it and a rank left waiting at one would hang the job. Only
+    rank 0 saves and prints."""
+    if mpi.rank != 0:
+        for name, job_key, extra, get_kwargs in ACTIVE_MATRICES:
+            build_matrix(name, job_key, extra, get_kwargs)
+        return
     os.makedirs(MATRIX_OUT_DIR, exist_ok=True)
     print(f'\n=== {len(ACTIVE_MATRICES)} Fisher matrices -> {MATRIX_OUT_DIR}',
           flush=True)
@@ -397,6 +406,5 @@ if __name__ == '__main__':
             run_job(job_name)
         mpi.comm.barrier()
 
-    # Assembling the matrices is serial, so one rank does it.
-    if BUILD_MATRICES and mpi.rank == 0:
+    if BUILD_MATRICES:
         build_matrices()

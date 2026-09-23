@@ -26,17 +26,14 @@ from hdfisher import utils, config
 from hd_pk import cmb_from_pk
 
 
-# the Boltzmann code calculates the spectra this many multipoles past the
-# maximum multipole that is kept, as in hdfisher
-LMAX_BUFFER = 500
-
 # the order CAMB returns the CMB spectra in
 CAMB_SPECTRA = ['tt', 'ee', 'bb', 'te']
 
-# entries of the parameter file that CAMB does not take: the kSZ template
-# parameters, and the description of the binned P(k) (the number of bins,
-# the bin centers `k<n>`, the bin amplitudes `Pk<n>` or `eneg2tauPk<n>`,
-# and the effective spectral index used for the non-linear correction)
+# entries of the parameter file that neither CAMB nor CLASS takes: the kSZ
+# template parameters, and the description of the binned P(k) (the number
+# of bins, the bin centers `k<n>`, the bin amplitudes `Pk<n>` or
+# `eneg2tauPk<n>`, and the effective spectral index used for the
+# non-linear correction)
 KSZ_PARAMS = ['A_ksz', 'n_ksz']
 BINNED_PK_KEYS = ['nkbins', 'effective_ns_for_nonlinear']
 BIN_PARAM = re.compile(r'^(k|Pk|eneg2tauPk)(\d+)$')
@@ -70,44 +67,25 @@ def get_cl_ksz(lmax, A_ksz, n_ksz, hd_data_version='latest'):
     return cl_ksz
 
 
-# ----- CAMB parameters -----
+# ----- the Boltzmann code and the parameter file -----
 
-def remove_non_camb_params(params):
+def use_class_flag(use_class_or_camb):
+    """The `use_class` flag hdfisher takes, from the name of the Boltzmann
+    code: `True` for `'class'` and `False` for `'camb'`, in either case.
+    Anything else raises a `ValueError`."""
+    code = str(use_class_or_camb).lower()
+    if code not in ['camb', 'class']:
+        raise ValueError(f"use_class_or_camb must be 'camb' or 'class', not {use_class_or_camb!r}.")
+    return code == 'class'
+
+
+def remove_extra_params(params):
     """Returns a copy of the `params` dict without the entries that
-    describe the binned P(k) or the kSZ template."""
+    describe the binned P(k) or the kSZ template, which neither CAMB nor
+    CLASS takes."""
     return {key: value for key, value in params.items()
             if (key not in KSZ_PARAMS + BINNED_PK_KEYS)
             and (BIN_PARAM.match(key) is None)}
-
-
-def set_camb_params(lmax, param_file=None, use_H0=False, **cosmo_params):
-    """Returns a `CAMBparams` instance with the settings in the parameter
-    file, after removing the binned P(k) and kSZ entries that CAMB does not
-    take. The spectra are calculated to `lmax + LMAX_BUFFER`.
-
-    Parameters
-    ----------
-    lmax : int
-        The maximum multipole of the theory spectra.
-    param_file : str, default=None
-        The file name, including the absolute path, of a YAML file with
-        the parameter names and values. If not provided, the hdfisher
-        default is used.
-    use_H0 : bool, default=False
-        Pass the Hubble constant instead of CosmoMC theta to CAMB, if both
-        are in the parameter file.
-    **cosmo_params : dict of float
-        Parameter names and values that override the values in the file.
-
-    See Also
-    --------
-    hdfisher.theory.set_cosmo_params
-    """
-    params = hdtheory.set_cosmo_params(param_file=param_file, use_H0=use_H0,
-                                       **cosmo_params)
-    params = remove_non_camb_params(params)
-    params['lmax'] = int(lmax) + LMAX_BUFFER
-    return camb.set_params(**params)
 
 
 # ----- the binned P(k) -----
@@ -220,19 +198,24 @@ class Theory(hdtheory.Theory):
     """Calculate the CMB and lensing power spectra and the BAO theory, with
     the option of a binned primordial power spectrum and a kSZ template.
 
-    This takes the same arguments as `hdfisher.theory.Theory`, plus the
-    ones below. Without them it does exactly what hdfisher does.
+    This takes the same arguments as `hdfisher.theory.Theory`, except that
+    the Boltzmann code is chosen by name with `use_class_or_camb` instead
+    of the `use_class` flag, plus the ones below. Without them it does
+    exactly what hdfisher does.
 
     Parameters
     ----------
+    use_class_or_camb : str, default='camb'
+        The Boltzmann code, `'camb'` or `'class'` (either case). hdfisher
+        is given `use_class=True` for `'class'` and `False` for `'camb'`.
     binned_pk : bool, default=False
         If `True`, the primordial power spectrum is a set of amplitudes in
-        k bins instead of a power law. The `param_file` must then give the
-        fiducial power law (`logA` or `As`, and `ns`), the number of bins
-        (`nkbins`), the bin centers (`k1`, `k2`, ...), the bin amplitudes
-        (`Pk1`, `Pk2`, ... or `eneg2tauPk1`, ...), and
-        `effective_ns_for_nonlinear`. Requires `bin_edges`, and only works
-        with CAMB.
+        k bins instead of a power law. The parameters (`params` or
+        `param_file`) must then give the fiducial power law (`logA` or
+        `As`, and `ns`), the number of bins (`nkbins`), the bin centers
+        (`k1`, `k2`, ...), the bin amplitudes (`Pk1`, `Pk2`, ... or
+        `eneg2tauPk1`, ...), and `effective_ns_for_nonlinear`. Requires
+        `bin_edges`, and only works with CAMB.
     bin_edges : str or array_like of float, default=None
         The k bin edges in Mpc^-1, either as an array or as the name of a
         text file that `numpy.loadtxt` can read. Needed when
@@ -240,7 +223,7 @@ class Theory(hdtheory.Theory):
     ksz : bool, default=False
         If `True`, add the kSZ template to the theory TT spectrum. Its
         amplitude `A_ksz` and tilt `n_ksz` are taken from `cosmo_params`
-        if given there, and from the `param_file` otherwise.
+        if given there, and from the parameters otherwise.
     pk_frac_step : float, default=0.05
         The fraction by which the power inside a k bin is changed when the
         amplitude of that bin is varied. This must match the relative step
@@ -262,25 +245,37 @@ class Theory(hdtheory.Theory):
     the `hd_pk` integral over the matter power spectrum, and the delensed
     spectra come from `hd_pk.cmb_from_pk.calculate_theory_spectra`, which
     delenses with the minimum-variance lensing reconstruction noise from
-    hdMockData rather than the `nlkk` passed here.
+    hdMockData rather than the `nlkk` passed here. Only one bin amplitude
+    can be varied at a time.
 
-    The parameter file's maximum multipole is not used; the spectra are
-    calculated to `lmax + LMAX_BUFFER` and kept to `lmax`.
+    The binned P(k) and kSZ entries of the parameters are taken out before
+    the rest is handed to hdfisher, which sets up CAMB or CLASS as usual,
+    with the spectra calculated to `lmax + 500` and kept to `lmax`.
     """
 
-    def __init__(self, lmax, output_dir, output_root=None, param_file=None,
+    def __init__(self, lmax, output_dir, output_root=None, params=None,
                  nlkk=None, recon_lmin=None, recon_lmax=None, use_H0=False,
-                 use_class=False, binned_pk=False, bin_edges=None, ksz=False,
-                 pk_frac_step=0.05, hd_data_version='latest', **cosmo_params):
+                 use_class_or_camb='camb', param_file=None, binned_pk=False,
+                 bin_edges=None, ksz=False, pk_frac_step=0.05,
+                 hd_data_version='latest', **cosmo_params):
+        use_class = use_class_flag(use_class_or_camb)
+        self.use_class_or_camb = 'class' if use_class else 'camb'
         self.binned_pk = binned_pk
         self.pk_frac_step = pk_frac_step
         self.hd_data_version = hd_data_version
         if isinstance(bin_edges, str):
             bin_edges = np.loadtxt(bin_edges)
-        self.bin_edges = None if (bin_edges is None) else np.asarray(bin_edges, dtype=float)
+        self.pk_bin_edges = None if (bin_edges is None) else np.asarray(bin_edges, dtype=float)
+        # which bin is varied (counting from zero) and by how much; filled
+        # in by `_setup_boltzmann_params` when a bin amplitude is passed
+        self.varied_bin = None
+        self.pk_step = 0.0
         # the fiducial values, used for the kSZ template and to tell which
         # way a bin amplitude has been varied:
-        self.fid_params = hdtheory.get_params(param_file=param_file)
+        if params is None:
+            params = param_file
+        self.fid_params = hdtheory.get_param_dict(param_dict_or_file=params,
+                                                  use_class=use_class)
         self.ksz = ksz
         self.A_ksz = cosmo_params.pop('A_ksz', self.fid_params.get('A_ksz'))
         self.n_ksz = cosmo_params.pop('n_ksz', self.fid_params.get('n_ksz'))
@@ -290,46 +285,54 @@ class Theory(hdtheory.Theory):
         # the base class sets up the Boltzmann code parameters through
         # `_setup_boltzmann_params` below, which uses the attributes above
         super().__init__(lmax, output_dir, output_root=output_root,
-                         param_file=param_file, nlkk=nlkk,
-                         recon_lmin=recon_lmin, recon_lmax=recon_lmax,
-                         use_H0=use_H0, use_class=use_class, **cosmo_params)
+                         params=params, nlkk=nlkk, recon_lmin=recon_lmin,
+                         recon_lmax=recon_lmax, use_H0=use_H0,
+                         use_class=use_class, **cosmo_params)
 
 
-    def _setup_boltzmann_params(self, param_file=None, use_H0=False, **cosmo_params):
-        """Set up `self.camb_params` or `self.class_params`. For a binned
-        P(k), also work out which bin (if any) is varied, and in which
-        direction."""
+    def _setup_boltzmann_params(self, params=None, use_H0=False, **cosmo_params):
+        """Set up `self.camb_params` or `self.class_params` with hdfisher,
+        after taking out the binned P(k) and kSZ entries that the Boltzmann
+        code does not take. For a binned P(k), also work out which bin (if
+        any) is varied, and in which direction."""
+        if self.use_class and self.binned_pk:
+            raise ValueError("The binned P(k) is only calculated with CAMB; set `use_class_or_camb='camb'`.")
+        params = remove_extra_params(self.fid_params)
+        overrides = remove_extra_params(cosmo_params)
         if self.use_class:
-            if self.binned_pk:
-                raise ValueError("The binned P(k) is only calculated with CAMB; set `use_class=False`.")
-            self.camb_params = None
             # CLASS reads the BBN table itself, so it needs the full path
-            cosmo_params.setdefault(
+            overrides.setdefault(
                 'sBBN file', hd_data.HDMockData(version=self.hd_data_version).class_sbbn_file)
-            self.class_params = hdtheory.set_class_params(
-                self.lmax, param_file=param_file, use_H0=use_H0, **cosmo_params)
-            self.class_params['l_max_scalars'] = self.lmax + LMAX_BUFFER
-            return
-        self.class_params = None
-        self.camb_params = set_camb_params(self.lmax, param_file=param_file,
-                                           use_H0=use_H0, **cosmo_params)
-        self.varied_bin = None
-        self.pk_step = 0.0
-        if not self.binned_pk:
-            return
+        super()._setup_boltzmann_params(params=params, use_H0=use_H0, **overrides)
+        if self.binned_pk:
+            self._find_varied_bin(cosmo_params)
+
+
+    def _find_varied_bin(self, cosmo_params):
+        """Set `varied_bin` and `pk_step` from the bin amplitude in
+        `cosmo_params` (if there is one) whose value differs from its
+        fiducial value. Only one bin can be varied at a time."""
+        varied = []
         for name, value in cosmo_params.items():
             match = BIN_PARAM.match(name)
             if (match is None) or (match.group(1) == 'k'):
                 continue
-            self.varied_bin = int(match.group(2)) - 1
-            fid = self.fid_params[name]
-            self.pk_step = self.pk_frac_step if (value >= fid) else -self.pk_frac_step
-            # the finite difference in the Fisher derivative divides by the
-            # step in the step-size file, so the two steps must agree
-            implied_step = abs(value / fid - 1)
-            if abs(implied_step - self.pk_frac_step) > 1e-3 * self.pk_frac_step:
-                msg = (f"The value of {name} is {implied_step:.6f} of its fiducial value away from it, but the power in that bin is changed by pk_frac_step = {self.pk_frac_step}. The derivative with respect to {name} will be off by the ratio of the two. Set pk_frac_step to the relative step size of the bin amplitudes in the step-size file.")
-                warnings.warn(msg)
+            if value != self.fid_params[name]:
+                varied.append((name, value, int(match.group(2)) - 1))
+        if len(varied) > 1:
+            names = ', '.join(name for name, _, _ in varied)
+            raise ValueError(f"Only one bin amplitude can be varied at a time, but {names} were all changed from their fiducial values.")
+        if not varied:
+            return
+        name, value, self.varied_bin = varied[0]
+        fid = self.fid_params[name]
+        self.pk_step = self.pk_frac_step if (value > fid) else -self.pk_frac_step
+        # the finite difference in the Fisher derivative divides by the
+        # step in the step-size file, so the two steps must agree
+        implied_step = abs(value / fid - 1)
+        if abs(implied_step - self.pk_frac_step) > 1e-3 * self.pk_frac_step:
+            msg = (f"The value of {name} is {implied_step:.6f} of its fiducial value away from it, but the power in that bin is changed by pk_frac_step = {self.pk_frac_step}. The derivative with respect to {name} will be off by the ratio of the two. Set pk_frac_step to the relative step size of the bin amplitudes in the step-size file.")
+            warnings.warn(msg)
 
 
     def get_binned_pk_results(self):
@@ -344,7 +347,7 @@ class Theory(hdtheory.Theory):
                 pars, pk_transfer_function = pars_fid, None
             else:
                 pars, pk_transfer_function = binned_pk_camb_params(
-                    self.camb_params, bin_edges=self.bin_edges,
+                    self.camb_params, bin_edges=self.pk_bin_edges,
                     varied_bin=self.varied_bin, step=self.pk_step,
                     effective_ns=effective_ns)
             results = camb.get_results(pars)
@@ -389,10 +392,10 @@ class Theory(hdtheory.Theory):
         `output_dir`, or `None` if they have to be calculated."""
         if overwrite:
             return None
-        if all(s in self.theo[cmb_type] for s in config.theo_cols):
+        if all(s in self.theo.get(cmb_type, {}) for s in config.theo_cols):
             return self.theo[cmb_type].copy()
-        fname = self.theo_fnames[cmb_type]
-        if os.path.exists(fname):
+        fname = self.theo_fnames.get(cmb_type)
+        if (fname is not None) and os.path.exists(fname):
             print(f'loading {cmb_type} theory from {fname}')
             return utils.load_from_file(fname, config.theo_cols)
         return None

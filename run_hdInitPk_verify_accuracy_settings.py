@@ -101,12 +101,11 @@ eight_params = ['mnu', 'tau', 'logA', 'H0', 'ombh2', 'omch2', 'ns', 'nnu']
 camb_to_class_fisher_params = {
     'ombh2': 'omega_b', 'omch2': 'omega_cdm', 'theta': 'theta_s_100',
     'tau': 'tau_reio', 'logA': 'ln_A_s_1e10', 'As': 'A_s', 'ns': 'n_s',
-    'H0': 'H0', 'nnu': 'Neff', 'mnu': 'sum_m_ncdm', 'nrun': 'alpha_s',
+    'H0': 'H0', 'nnu': 'N_ur', 'mnu': 'sum_m_ncdm', 'nrun': 'alpha_s',
     'omk': 'Omega_k', 'w': 'w0_fld', 'wa': 'wa_fld',
     'HMCode_logT_AGN': 'log10T_heat_hmcode',
 }
 class_to_camb_fisher_params = {v: k for k, v in camb_to_class_fisher_params.items()}
-class_to_camb_fisher_params['Neff'] = 'nnu'
 
 
 def from_class_fisher(result):
@@ -215,8 +214,8 @@ def calculate_spectra(spectra_path):
               + ('' if value is None else f' at {value}'), flush=True)
         if code == 'class':
             theolib = theory.Theory(
-                SPECTRA_LMAX, spectra_path, use_class=True,
-                param_file=hdinitPkfisher.fiducial_param_file(use_class=True),
+                SPECTRA_LMAX, spectra_path, use_class_or_camb='class',
+                param_file=hdinitPkfisher.fiducial_param_file(use_class_or_camb='class'),
                 **{'P_k_max_h/Mpc': value})
         else:
             settings = (TRUE_UNIVERSE_SETTINGS if code == 'true'
@@ -257,10 +256,10 @@ def load_inputs():
     # nine-parameter files provided with hdinitpk, the same ones the
     # forecast script uses.
     camb_fisherlib = hdinitPkfisher.Fisher(
-        CAMB_DERIV_DIR, overwrite=False, use_H0=use_H0, use_class=False,
+        CAMB_DERIV_DIR, overwrite=False, use_H0=use_H0, use_class_or_camb='camb',
         hd_data_version=hd_data_version)
     class_fisherlib = hdinitPkfisher.Fisher(
-        CLASS_DERIV_DIR, overwrite=False, use_H0=use_H0, use_class=True,
+        CLASS_DERIV_DIR, overwrite=False, use_H0=use_H0, use_class_or_camb='class',
         hd_data_version=hd_data_version)
 
     if mpi.rank == 0:

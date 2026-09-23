@@ -11,11 +11,12 @@ all from hdMockData) are inherited from hdfisher as they are.
 import os
 import numpy as np
 from hdfisher import fisher as hdfisher_fisher
+from hdfisher import theory as hdtheory
 from hdfisher import config, dataconfig, utils
 from . import data_path, theory
 
 
-def fiducial_param_file(use_class=False, feedback=False):
+def fiducial_param_file(use_class_or_camb='camb', feedback=False):
     """The fiducial parameter file provided with hdinitpk for CAMB or
     CLASS, with or without the HMCode 2020 baryonic feedback model.
 
@@ -24,16 +25,16 @@ def fiducial_param_file(use_class=False, feedback=False):
     al. (2026) added: the running of the spectral index, the Hubble
     constant, and (with feedback) the kSZ template amplitude and tilt.
     """
-    code = 'class' if use_class else 'camb'
+    code = 'class' if theory.use_class_flag(use_class_or_camb) else 'camb'
     feedback_info = '_feedback' if feedback else ''
     return data_path('fisher_fid_params', f'{code}_fiducial_params{feedback_info}.yaml')
 
 
-def fiducial_fisher_steps_file(use_class=False, feedback=False, ksz=False):
+def fiducial_fisher_steps_file(use_class_or_camb='camb', feedback=False, ksz=False):
     """The step-size file provided with hdinitpk for CAMB or CLASS, with or
     without the baryonic feedback parameter and the kSZ template
     parameters."""
-    code = 'class' if use_class else 'camb'
+    code = 'class' if theory.use_class_flag(use_class_or_camb) else 'camb'
     feedback_info = '_feedback' if feedback else ''
     ksz_info = '_ksz' if ksz else ''
     return data_path('fisher_steps', f'{code}_fiducial_step_sizes{feedback_info}{ksz_info}.yaml')
@@ -45,15 +46,20 @@ class Fisher(hdfisher_fisher.Fisher):
 
     This takes the same arguments as `hdfisher.fisher.Fisher` (including
     `exp`, `hd_data_version`, and `pol_only_lensing`, which go to
-    `hdfisher.fisher.FisherData`), plus the ones below.
+    `hdfisher.fisher.FisherData`), except that the Boltzmann code is
+    chosen by name with `use_class_or_camb` instead of the `use_class`
+    flag, plus the ones below.
 
     Parameters
     ----------
+    use_class_or_camb : str, default='camb'
+        The Boltzmann code, `'camb'` or `'class'` (either case). hdfisher
+        is given `use_class=True` for `'class'` and `False` for `'camb'`.
     binned_pk : bool, default=False
         If `True`, the primordial power spectrum is a set of amplitudes in
         k bins instead of a power law. See `hdinitpk.theory.Theory` for
-        what the `param_file` must then contain. The `fisher_steps_file`
-        must give a step size for each bin amplitude. Requires `bin_edges`,
+        what the fiducial parameters must then contain. The step sizes
+        must include one for each bin amplitude. Requires `bin_edges`,
         and only works with CAMB.
     bin_edges : str or array_like of float, default=None
         The k bin edges in Mpc^-1, either as an array or as the name of a
@@ -61,14 +67,13 @@ class Fisher(hdfisher_fisher.Fisher):
         `binned_pk=True`.
     ksz : bool, default=False
         If `True`, add the kSZ template to the theory TT spectrum. Its
-        amplitude `A_ksz` and tilt `n_ksz` must have fiducial values in the
-        `param_file`, and can be varied like any other parameter by giving
-        them step sizes in the `fisher_steps_file`.
+        amplitude `A_ksz` and tilt `n_ksz` must have fiducial values in
+        the fiducial parameters, and can be varied like any other
+        parameter by giving them step sizes.
     pk_frac_step : float, default=0.05
         The fraction by which the power inside a k bin is changed when its
         amplitude is varied. Must match the relative step size of the bin
-        amplitudes in the `fisher_steps_file`; see
-        `hdinitpk.theory.Theory`.
+        amplitudes in the step sizes; see `hdinitpk.theory.Theory`.
 
     Notes
     -----
@@ -76,59 +81,73 @@ class Fisher(hdfisher_fisher.Fisher):
     mock data (24,000 for version v1.2) for every experiment, and then cut
     to the multipole range of the experiment, as in Cheslog et. al. (2026).
 
-    If no `param_file` or `fisher_steps_file` is given, the files provided
-    with hdinitpk are used; see `fiducial_param_file` and
+    If no fiducial parameters or step sizes are given (as `fiducial_params`
+    or `param_file`, and `step_sizes` or `fisher_steps_file`), the copies
+    saved in `fisher_dir` by an earlier run are used, or else the files
+    provided with hdinitpk; see `fiducial_param_file` and
     `fiducial_fisher_steps_file`.
     """
 
-    def __init__(self, fisher_dir, param_file=None, fisher_steps_file=None,
-                 fisher_params=None, use_H0=False, use_class=False,
-                 feedback=False, overwrite=False, binned_pk=False,
-                 bin_edges=None, ksz=False, pk_frac_step=0.05, **kwargs):
-        # these are used by `get_param_file` and `get_fisher_steps_file`,
-        # which the base class calls during its initialization
-        self.use_class = use_class
+    def __init__(self, fisher_dir, fiducial_params=None, step_sizes=None,
+                 fisher_params=None, use_H0=False, feedback=False,
+                 use_class_or_camb='camb', overwrite=False, param_file=None,
+                 fisher_steps_file=None, binned_pk=False, bin_edges=None,
+                 ksz=False, pk_frac_step=0.05, **kwargs):
+        use_class = theory.use_class_flag(use_class_or_camb)
+        # these are used by `_get_fid_params` and `_get_step_sizes`, which
+        # the base class calls during its initialization
+        self.use_class_or_camb = 'class' if use_class else 'camb'
+        self.feedback = feedback
         self.binned_pk = binned_pk
         self.ksz = ksz
         self.pk_frac_step = pk_frac_step
+        # the k bin edges are kept as `pk_bin_edges`, since hdfisher uses
+        # `bin_edges` for the multipole bins of the covariance matrix
         if isinstance(bin_edges, str):
             bin_edges = np.loadtxt(bin_edges)
-        self.bin_edges = None if (bin_edges is None) else np.asarray(bin_edges, dtype=float)
-        super().__init__(fisher_dir, param_file=param_file,
-                         fisher_steps_file=fisher_steps_file,
-                         fisher_params=fisher_params, use_H0=use_H0,
-                         feedback=feedback, overwrite=overwrite,
-                         use_class=use_class, **kwargs)
-        self.use_class = use_class
-        # CLASS does not calculate delensed spectra
-        if use_class:
-            self.cmb_types = ['lensed', 'unlensed']
+        self.pk_bin_edges = None if (bin_edges is None) else np.asarray(bin_edges, dtype=float)
+        super().__init__(fisher_dir, fiducial_params=fiducial_params,
+                         step_sizes=step_sizes, fisher_params=fisher_params,
+                         use_H0=use_H0, feedback=feedback, use_class=use_class,
+                         overwrite=overwrite, param_file=param_file,
+                         fisher_steps_file=fisher_steps_file, **kwargs)
         # the theory is calculated to the CMB-HD lmax for every experiment
         self.theo_lmax = self.data.hd_datalib.theo_lmax
 
 
-    def get_param_file(self, feedback=False):
-        """The fiducial parameter file to use when none was given: the copy
-        saved in `fisher_dir` by an earlier run, or else the file provided
-        with hdinitpk for this Boltzmann code."""
-        input_param_file = os.path.join(self.fisher_dir, 'fiducial_params.yaml')
-        if os.path.exists(input_param_file) and (not self.overwrite):
-            return input_param_file
-        return fiducial_param_file(use_class=self.use_class, feedback=feedback)
+    def _get_fid_params(self, fiducial_params=None, param_file=None, feedback=False):
+        """The fiducial parameters: the ones passed, or else the copy saved
+        in `fisher_dir` by an earlier run, or else the file provided with
+        hdinitpk for this Boltzmann code."""
+        if (fiducial_params is None) and (param_file is None):
+            saved = self.param_file_name()
+            if os.path.exists(saved) and (not self.overwrite):
+                param_file = saved
+            else:
+                param_file = fiducial_param_file(use_class_or_camb=self.use_class_or_camb,
+                                                 feedback=feedback)
+        return hdtheory.get_param_dict(param_dict_or_file=fiducial_params,
+                                       use_class=self.use_class, param_file=param_file)
 
 
-    def get_fisher_steps_file(self, feedback=False):
-        """The step-size file to use when none was given: the copy saved in
+    def _get_step_sizes(self, step_sizes=None, fisher_steps_file=None):
+        """The step sizes: the ones passed, or else the copy saved in
         `fisher_dir` by an earlier run, or else the file provided with
         hdinitpk for this Boltzmann code."""
-        input_steps_file = os.path.join(self.fisher_dir, 'step_sizes.yaml')
-        if os.path.exists(input_steps_file) and (not self.overwrite):
-            return input_steps_file
-        return fiducial_fisher_steps_file(use_class=self.use_class,
-                                          feedback=feedback, ksz=self.ksz)
+        if (step_sizes is None) and (fisher_steps_file is None):
+            saved = self.step_sizes_file_name()
+            if os.path.exists(saved) and (not self.overwrite):
+                fisher_steps_file = saved
+            else:
+                fisher_steps_file = fiducial_fisher_steps_file(
+                    use_class_or_camb=self.use_class_or_camb, feedback=self.feedback,
+                    ksz=self.ksz)
+        return hdfisher_fisher.get_step_sizes_dict(steps_dict_or_file=step_sizes,
+                                                   use_class=self.use_class,
+                                                   fisher_steps_file=fisher_steps_file)
 
 
-    def calculate_theory_for_deriv(self, param, value):
+    def calculate_theory_for_deriv(self, param, value, use_H0=None):
         """Calculate and save the CMB and BAO theory when `param` has the
         given `value`, with the other parameters at their fiducial values.
 
@@ -143,12 +162,13 @@ class Fisher(hdfisher_fisher.Fisher):
             step_direction = 'up' if (value > self.fid_params[param]) else 'down'
             if param == 'logA': # so that `logA` is used rather than `As`
                 cosmo_params['As'] = None
+        use_H0 = self.use_H0 if (use_H0 is None) else use_H0
         theolib = theory.Theory(self.theo_lmax, self.theo_dir,
-                                param_file=self.param_file, nlkk=self.nlkk,
+                                params=self.fid_params, nlkk=self.nlkk,
                                 recon_lmin=self.Lmin, recon_lmax=self.Lmax,
-                                use_H0=self.use_H0, use_class=self.use_class,
+                                use_H0=use_H0, use_class_or_camb=self.use_class_or_camb,
                                 binned_pk=self.binned_pk,
-                                bin_edges=self.bin_edges, ksz=self.ksz,
+                                bin_edges=self.pk_bin_edges, ksz=self.ksz,
                                 pk_frac_step=self.pk_frac_step,
                                 hd_data_version=self.hd_data_version,
                                 **cosmo_params)
@@ -160,10 +180,10 @@ class Fisher(hdfisher_fisher.Fisher):
         header_info = f'{param} = {value}\n'
         for cmb_type in self.cmb_types:
             cmb_theo_fname = config.fisher_cmb_theo_fname(
-                self.theo_dir, cmb_type, param, step_direction, use_H0=self.use_H0)
+                self.theo_dir, cmb_type, param, step_direction, use_H0=use_H0)
             utils.save_to_file(cmb_theo_fname, cmb_theo[cmb_type],
                                keys=config.theo_cols, extra_header_info=header_info)
         bao_theo_fname = config.fisher_bao_theo_fname(
-            self.theo_dir, param, step_direction, use_H0=self.use_H0)
+            self.theo_dir, param, step_direction, use_H0=use_H0)
         utils.save_to_file(bao_theo_fname, {'z': z, 'rs_dv': rs_dv},
                            keys=['z', 'rs_dv'], extra_header_info=header_info)

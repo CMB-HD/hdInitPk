@@ -16,16 +16,16 @@ H0: 67.36
 
 # ----- neutrinos -----
 #
-# `sum_m_ncdm` is the total neutrino mass, the same quantity as CAMB's `mnu`.
-# It is not a CLASS parameter: `hdfisher.theory.set_class_params` splits it
-# evenly over the `N_ncdm` massive species and passes CLASS `m_ncdm`. This is
-# what lets the Fisher code vary the total mass, since CLASS wants `m_ncdm`
-# as a comma-separated string. `Neff` is handled the same way and becomes
-# CLASS's `N_ur`. Give `sum_m_ncdm` or `m_ncdm`, and `Neff` or `N_ur`, not
-# both.
+# Three massive neutrinos of 0.02 eV each, and N_ur = 0.00441 massless ones,
+# for N_eff = 3.044, as in the CLASS settings of hdMockData. hdfisher reads
+# the total mass off `m_ncdm` as `sum_m_ncdm` (the same quantity as CAMB's
+# `mnu`), so that the step-size file can vary the total mass; it then splits
+# the new total evenly over the three species when it calls CLASS. There is
+# no such alias for N_eff: the step-size file varies `N_ur` directly.
 N_ncdm: 3
-sum_m_ncdm: 0.06
-Neff: 3.044
+deg_ncdm: 1,1,1
+m_ncdm: 0.02,0.02,0.02
+N_ur: 0.00441
 
 
 
@@ -36,6 +36,13 @@ Neff: 3.044
 # ----- non-linear model -----
 hmcode_version: 2020_baryonic_feedback
 log10T_heat_hmcode: 7.8
+
+# ----- kSZ template -----
+# The amplitude and tilt of the kSZ template that hdinitpk adds to TT when
+# ksz=True. These are not CLASS parameters; hdinitpk takes them out before
+# the rest is passed to CLASS.
+A_ksz: 1.0
+n_ksz: 0.0
 
 
 

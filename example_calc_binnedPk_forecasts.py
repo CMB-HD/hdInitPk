@@ -75,7 +75,7 @@ fisherlib = hdinitPkfisher.Fisher(
     overwrite=True,           # discards anything already in fisher_dir
     exp='so',                 # SO-like noise and sky coverage
     use_H0=True,              # marginalize over H0 rather than theta
-    use_class=False,          # binned P(k) goes through CAMB and hd_pk
+    use_class_or_camb='camb', # binned P(k) goes through CAMB and hd_pk
     hd_data_version='v1.2',   # the mock data version, from hdMockData,
                               #  which also sets the lmax of the theory
     binned_pk=True,

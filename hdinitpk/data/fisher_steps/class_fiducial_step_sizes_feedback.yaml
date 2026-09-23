@@ -34,9 +34,15 @@ alpha_s:
         step_size: 0.01
         step_type: absolute
 
-Neff:
-        step_size: 0.05
-        step_type: relative
+# CLASS takes the number of massless neutrinos `N_ur`, not N_eff. With three
+# massive species fixed, a change in N_ur is the same change in N_eff, so the
+# 5% relative step in N_eff used with CAMB (0.05 * 3.044 = 0.1522) becomes an
+# absolute step of 0.1522 in N_ur, and the derivative is the same. The step
+# down takes N_ur below zero, which CLASS only allows after the change to its
+# source code described in Appendix A of Cheslog et. al. (2026).
+N_ur:
+        step_size: 0.1522
+        step_type: absolute
 
 log10T_heat_hmcode:
         step_size: 0.05

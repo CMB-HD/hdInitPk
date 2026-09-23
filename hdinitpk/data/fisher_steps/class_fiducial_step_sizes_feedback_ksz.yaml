@@ -44,13 +44,15 @@ N_ur:
         step_size: 0.1522
         step_type: absolute
 
-# ----- dark energy -----
-# w(a) = w0_fld + wa_fld * (1 - a).
-w0_fld:
-        step_size: 0.01
-        step_type: relative
-wa_fld:
-        # absolute, because the fiducial wa_fld is 0 and a relative step of
-        # it would be no step at all.
+log10T_heat_hmcode:
+        step_size: 0.05
+        step_type: absolute
+
+# the kSZ template amplitude and tilt, the same steps as in the CAMB file
+A_ksz:
+        step_size: 0.1
+        step_type: absolute
+
+n_ksz:
         step_size: 0.01
         step_type: absolute

@@ -14,7 +14,7 @@ To use this software, you must have Python (version 3.9 or later) installed, alo
 - [SciPy](https://scipy.org/)
 - [PyYAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
 - [CAMB](https://camb.readthedocs.io/en/latest/)
-- [hdfisher](https://github.com/CMB-HD/hdfisher), the version with the CLASS option
+- [hdfisher](https://github.com/CMB-HD/hdfisher)
 - [hdMockData](https://github.com/CMB-HD/hdMockData), version `v1.2` or later. The CMB-HD theory spectra and bandpowers from CAMB and CLASS, the covariance matrices, the lensing reconstruction noise, and the CAMB and CLASS settings used here were added in v1.2.
 - [hdPk](https://github.com/CMB-HD/hdPk), which provides `cmb_from_pk`, used for the binned primordial power spectrum calculation
 - [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper `classy`, only needed to recompute the CLASS Fisher forecasts or to run the CLASS CMB-HD chains
@@ -252,7 +252,7 @@ Fisher mode splits each experiment's samples across all ranks. Chain mode distri
 
 `run_hdInitPk_forecasts.ipynb` already does all of this for the nine configurations in the paper, and `run_hdInitPk_forecasts.py` does the same as a batch job. This section is for forecasting something the paper does not cover.
 
-`hdinitpk.hdinitPkfisher.Fisher` extends [hdfisher](https://github.com/CMB-HD/hdfisher)'s `Fisher` with a binned primordial power spectrum and a kSZ template, and takes the same arguments plus `binned_pk`, `bin_edges`, `ksz`, and `pk_frac_step`. Code written with `hdfisher` only needs to change its import. The theory is calculated to the maximum multipole of the CMB-HD mock data in hdMockData (24,000 for v1.2) for every experiment, and the covariance matrices, the lensing reconstruction noise, the binning, and the BBN table that CLASS reads all come from hdMockData. The fiducial-parameter files in `hdinitpk/data/fisher_fid_params` hold the cosmology and the parameters that are varied; their accuracy settings are the ones in hdMockData.
+`hdinitpk.hdinitPkfisher.Fisher` extends [hdfisher](https://github.com/CMB-HD/hdfisher)'s `Fisher` with a binned primordial power spectrum and a kSZ template, and takes the same arguments plus `binned_pk`, `bin_edges`, `ksz`, and `pk_frac_step`, with one difference: the Boltzmann code is chosen by name, `use_class_or_camb='camb'` or `'class'` (either case), in place of hdfisher's `use_class` flag. Code written with `hdfisher` only needs to change its import and that one argument. The theory is calculated to the maximum multipole of the CMB-HD mock data in hdMockData (24,000 for v1.2) for every experiment, and the covariance matrices, the lensing reconstruction noise, the binning, and the BBN table that CLASS reads all come from hdMockData. The fiducial-parameter files in `hdinitpk/data/fisher_fid_params` hold the cosmology and the parameters that are varied; their accuracy settings are the ones in hdMockData.
 
 `example_calc_binnedPk_forecasts.py` is a template for calculating the Fisher derivatives, and shows how to assemble a Fisher matrix from them afterwards.
 
@@ -271,4 +271,6 @@ Because the derivatives are computed by perturbing the spectra inside one $k$ bi
 
 The derivatives are large. The example writes them to `hdinitpk/data/user_generated_data/fisher_derivs`.
 
-The binned-$\mathcal{P}(k)$ calculation uses CAMB (via `hdPk`) and cannot be combined with `use_class=True`. Any additional parameter accepted by CAMB's [`set_params`](https://camb.readthedocs.io/en/latest/camb.html#camb.set_params) may be varied.
+The binned-$\mathcal{P}(k)$ calculation uses CAMB (via `hdPk`) and cannot be combined with `use_class_or_camb='class'`. Any additional parameter accepted by CAMB's [`set_params`](https://camb.readthedocs.io/en/latest/camb.html#camb.set_params) may be varied.
+
+The CLASS parameter files name the parameters the way CLASS does. Two of them differ from CAMB in more than name. The total neutrino mass is varied as `sum_m_ncdm`, an hdfisher alias that it reads off the `m_ncdm` entry and splits evenly over the massive species again after each step, so the same 10% relative step as CAMB's `mnu` applies. $N_\mathrm{eff}$ is varied as `N_ur`, the number of massless neutrinos, with an absolute step of 0.1522: with the three massive species fixed, that is the same change in $N_\mathrm{eff}$ as the 5% relative step used with CAMB, and the derivative is the same.
