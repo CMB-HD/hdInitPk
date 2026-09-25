@@ -47,6 +47,7 @@ from hd_mock_data import hd_data
 
 import hdinitpk
 from hdinitpk import hdinitPkfisher
+from hdinitpk.theory import camb_param_names
 
 
 # The directory this script lives in, so that the paths below are relative
@@ -277,7 +278,9 @@ def make_camb_params_fisher(ombh2, omch2, H0, tau):
     pars.set_classes(recombination_model='Recfast')
     pars.InitPower.set_params(As=_AS_FID, ns=_NS_FID, pivot_scalar=_K_PIVOT)
     pars.set_matter_power(redshifts=[0.0], kmax=100, k_per_logint=130)
-    pars.set_for_lmax(LMAX + 500, lens_potential_accuracy=30, lens_margin=2050)
+    # `lens_margin` is called `lens_output_margin` from CAMB 2.0.0 on
+    pars.set_for_lmax(LMAX + 500, lens_potential_accuracy=30,
+                      **camb_param_names({'lens_margin': 2050}))
     pars.set_accuracy(**LISTING1_ACCURACY)
     pars.NonLinear = camb.model.NonLinear_both
     pars.NonLinearModel.set_params('mead2016')
@@ -295,7 +298,7 @@ def make_camb_params_chain(ombh2, omch2, H0, tau):
         As=_AS_FID, ns=_NS_FID, pivot_scalar=_K_PIVOT,
         redshifts=[0.0], WantCls=False, WantTransfer=True,
         lmax=LMAX,   # lens_potential_accuracy/lens_margin act through lmax
-        **CHAIN_CAMB_ACCURACY_SETTINGS,
+        **camb_param_names(CHAIN_CAMB_ACCURACY_SETTINGS),
     )
     return pars
 

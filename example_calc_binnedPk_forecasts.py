@@ -78,6 +78,8 @@ fisherlib = hdinitPkfisher.Fisher(
     use_class_or_camb='camb', # binned P(k) goes through CAMB and hd_pk
     hd_data_version='v1.2',   # the mock data version, from hdMockData,
                               #  which also sets the lmax of the theory
+                              #  (theo_lmax='hd', the default, as in the
+                              #  paper; None uses hdfisher's 5,000 for SO)
     binned_pk=True,
     bin_edges=bin_edges,
     pk_frac_step=pk_frac_step,

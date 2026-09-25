@@ -149,9 +149,10 @@ def to_class(params_):
 # The nine configurations
 # ----------------------------------------------------------------------
 # Every configuration is an `hdinitpk.hdinitPkfisher.Fisher`, which
-# extends hdfisher's `Fisher` with the binned P(k) and the kSZ template,
-# and calculates the theory to the CMB-HD lmax for SO as well. The
-# `kwargs` are what it is constructed with, on top of `hd_data_version`.
+# extends hdfisher's `Fisher` with the binned P(k) and the kSZ template.
+# The theory is calculated to the CMB-HD lmax (24,000) for SO as well,
+# as in the paper (`theo_lmax='hd'`, the default). The `kwargs` are what
+# it is constructed with, on top of `hd_data_version`.
 JOBS = {
     # CMB-HD, CLASS. Behind Table IV and Figures 2 and 4.
     'class': {

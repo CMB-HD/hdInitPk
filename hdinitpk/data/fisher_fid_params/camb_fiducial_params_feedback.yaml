@@ -1,6 +1,7 @@
 # cosmological parameters from Planck 2018 TT,TE,EE + low l + low E + lensing
 ombh2: 0.02237
 omch2: 0.1200
+theta: 1.04071
 tau: 0.0544
 logA: 3.044
 ns: 0.9649

@@ -11,7 +11,6 @@ all from hdMockData) are inherited from hdfisher as they are.
 import os
 import numpy as np
 from hdfisher import fisher as hdfisher_fisher
-from hdfisher import theory as hdtheory
 from hdfisher import config, dataconfig, utils
 from . import data_path, theory
 
@@ -74,12 +73,22 @@ class Fisher(hdfisher_fisher.Fisher):
         The fraction by which the power inside a k bin is changed when its
         amplitude is varied. Must match the relative step size of the bin
         amplitudes in the step sizes; see `hdinitpk.theory.Theory`.
+    theo_lmax : str or int or None, default='hd'
+        The maximum multipole the theory is calculated to. `'hd'` is the
+        maximum multipole of the CMB-HD mock data (24,000 for version
+        v1.2), for every experiment, which is what Cheslog et. al. (2026)
+        used for the SO-like forecasts as well. `None` keeps the value
+        hdfisher sets for the experiment (5,000 for the SO-like and S4-like
+        configurations). A number is used as it is.
 
     Notes
     -----
-    The theory is calculated out to the maximum multipole of the CMB-HD
-    mock data (24,000 for version v1.2) for every experiment, and then cut
-    to the multipole range of the experiment, as in Cheslog et. al. (2026).
+    The theory is calculated out to `theo_lmax` and then cut to the
+    multipole range of the experiment.
+
+    The parameter files provided with hdinitpk use the CAMB 1.x name
+    `lens_margin`. The entry is renamed to `lens_output_margin` when CAMB
+    2.0.0 or later is installed; see `hdinitpk.theory.camb_param_names`.
 
     If no fiducial parameters or step sizes are given (as `fiducial_params`
     or `param_file`, and `step_sizes` or `fisher_steps_file`), the copies
@@ -92,7 +101,7 @@ class Fisher(hdfisher_fisher.Fisher):
                  fisher_params=None, use_H0=False, feedback=False,
                  use_class_or_camb='camb', overwrite=False, param_file=None,
                  fisher_steps_file=None, binned_pk=False, bin_edges=None,
-                 ksz=False, pk_frac_step=0.05, **kwargs):
+                 ksz=False, pk_frac_step=0.05, theo_lmax='hd', **kwargs):
         use_class = theory.use_class_flag(use_class_or_camb)
         # these are used by `_get_fid_params` and `_get_step_sizes`, which
         # the base class calls during its initialization
@@ -111,14 +120,21 @@ class Fisher(hdfisher_fisher.Fisher):
                          use_H0=use_H0, feedback=feedback, use_class=use_class,
                          overwrite=overwrite, param_file=param_file,
                          fisher_steps_file=fisher_steps_file, **kwargs)
-        # the theory is calculated to the CMB-HD lmax for every experiment
-        self.theo_lmax = self.data.hd_datalib.theo_lmax
+        # the paper calculates the theory to the CMB-HD lmax for every
+        # experiment; `theo_lmax=None` keeps hdfisher's value instead
+        if isinstance(theo_lmax, str):
+            if theo_lmax.lower() != 'hd':
+                raise ValueError(f"theo_lmax must be 'hd', None, or a number, not {theo_lmax!r}.")
+            self.theo_lmax = self.data.hd_datalib.theo_lmax
+        elif theo_lmax is not None:
+            self.theo_lmax = int(theo_lmax)
 
 
     def _get_fid_params(self, fiducial_params=None, param_file=None, feedback=False):
         """The fiducial parameters: the ones passed, or else the copy saved
         in `fisher_dir` by an earlier run, or else the file provided with
-        hdinitpk for this Boltzmann code."""
+        hdinitpk for this Boltzmann code. The CAMB settings are named for
+        the installed version of CAMB."""
         if (fiducial_params is None) and (param_file is None):
             saved = self.param_file_name()
             if os.path.exists(saved) and (not self.overwrite):
@@ -126,8 +142,8 @@ class Fisher(hdfisher_fisher.Fisher):
             else:
                 param_file = fiducial_param_file(use_class_or_camb=self.use_class_or_camb,
                                                  feedback=feedback)
-        return hdtheory.get_param_dict(param_dict_or_file=fiducial_params,
-                                       use_class=self.use_class, param_file=param_file)
+        params = fiducial_params if (fiducial_params is not None) else param_file
+        return theory.get_param_dict(params, use_class=self.use_class)
 
 
     def _get_step_sizes(self, step_sizes=None, fisher_steps_file=None):

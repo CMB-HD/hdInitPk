@@ -6,8 +6,9 @@ template used in Cheslog et. al. (2026).
 - The primordial power spectrum can be a set of amplitudes in k bins
   (`Pk1`, `Pk2`, ... or `eneg2tauPk1`, ...) instead of a power law. The
   CMB and lensing spectra are then calculated with CAMB and `hd_pk`,
-  whose `calculate_clkk` integral gives the lensing spectrum and whose
-  `calculate_theory_spectra` gives the delensed spectra.
+  whose `calculate_clkk` integral gives the lensing spectrum. The
+  delensed spectra are made from it with the lensing reconstruction
+  noise passed in, as hdfisher does for a power law.
 - A kinematic SZ template, loaded from hdMockData, can be added to the
   theory TT spectrum, with an amplitude `A_ksz` and a tilt `n_ksz`.
 
@@ -77,6 +78,108 @@ def use_class_flag(use_class_or_camb):
     if code not in ['camb', 'class']:
         raise ValueError(f"use_class_or_camb must be 'camb' or 'class', not {use_class_or_camb!r}.")
     return code == 'class'
+
+
+def camb_param_names(params):
+    """A copy of the `params` dict with the CAMB settings named the way the
+    installed version of CAMB names them.
+
+    CAMB 2.0.0 renamed `lens_margin` to `lens_output_margin`. The parameter
+    files provided with hdinitpk use the old name. This renames it for CAMB
+    2.0.0 or later, and renames the new one back for older versions, so
+    either name works with either version. It is the same check hdMockData
+    makes to choose between its CAMB parameter files.
+
+    Parameters
+    ----------
+    params : dict
+        A dictionary of parameter names and values.
+
+    Returns
+    -------
+    dict
+        A copy with the renamed entry. If both names are present, the one
+        the installed CAMB takes is kept.
+    """
+    old, new = 'lens_margin', 'lens_output_margin'
+    use_new = int(camb.__version__.split('.')[0]) >= 2
+    wanted, unwanted = (new, old) if use_new else (old, new)
+    params = dict(params)
+    if unwanted in params:
+        value = params.pop(unwanted)
+        if wanted not in params:
+            params[wanted] = value
+    return params
+
+
+def get_param_dict(params=None, use_class=False):
+    """The dictionary of parameter names and values that hdfisher builds
+    from a dictionary or a YAML file (with its parameter aliases added),
+    with the CAMB settings renamed for the installed version of CAMB; see
+    `camb_param_names`.
+
+    Parameters
+    ----------
+    params : str or dict or None, default=None
+        A dictionary of parameter names and values, or the path to a YAML
+        file holding them. If `None`, hdfisher's fiducial parameters.
+    use_class : bool, default=False
+        Whether the parameters are for CLASS instead of CAMB.
+
+    Returns
+    -------
+    dict
+        The parameter names and values.
+    """
+    param_dict = hdtheory.get_param_dict(param_dict_or_file=params, use_class=use_class)
+    if (param_dict is not None) and (not use_class):
+        param_dict = camb_param_names(param_dict)
+    return param_dict
+
+
+def class_file_path(path):
+    """The form in which to give CLASS the path of a data file it opens
+    itself, such as the BBN table (`'sBBN file'`).
+
+    Up to version 3.3.1, CLASS opens the path it is given as it is, so an
+    absolute path works. From version 3.3.2 on, CLASS puts its `base_path`
+    in front of the path of every data file it opens, and classy sets
+    `base_path` to the directory classy is installed in. An absolute path
+    then ends up inside that directory, and CLASS cannot find the file. For
+    those versions the path is given relative to the classy directory,
+    starting with '/', which is the form CLASS's own default paths take
+    (for example '/external/bbn/sBBN_2025.dat').
+
+    Parameters
+    ----------
+    path : str
+        The path to the file, absolute or relative to the current directory.
+
+    Returns
+    -------
+    str
+        The path to pass to CLASS. It is returned unchanged if classy is not
+        installed, or if its version is older than 3.3.2.
+    """
+    try:
+        import classy
+    except ImportError:
+        return path
+    version = str(getattr(classy, '__version__', '')).lstrip('v')
+    try:
+        version = tuple(int(n) for n in version.split('.')[:3])
+    except ValueError:
+        return path
+    if version < (3, 3, 2):
+        return path
+    # the directory classy uses as `base_path`, found the same way classy does
+    try:
+        import importlib.resources
+        base_path = os.path.abspath(str(importlib.resources.files('classy')))
+    except Exception:
+        base_path = os.path.dirname(os.path.abspath(classy.__file__))
+    relative = os.path.relpath(os.path.abspath(path), base_path)
+    return '/' + relative.replace(os.sep, '/')
 
 
 def remove_extra_params(params):
@@ -153,12 +256,16 @@ def binned_pk_camb_params(camb_params, bin_edges=None, varied_bin=None,
     return pars, pk_transfer_function
 
 
-def binned_pk_spectra(lmax, camb_results, clkk, cmb_types=['lensed', 'unlensed']):
-    """The lensed and unlensed CMB spectra for a binned primordial power
-    spectrum, given the CAMB results for that spectrum and its lensing
-    power spectrum, in the same way as
-    `hd_pk.cmb_from_pk.calculate_theory_spectra`. The delensed spectra
-    come from that function itself; see `Theory.calculate_spectra`.
+def binned_pk_spectra(lmax, camb_results, clkk, cmb_types=['lensed', 'unlensed'],
+                      nlkk=None, Lmin=None, Lmax=None):
+    """The lensed, unlensed, and delensed CMB spectra for a binned
+    primordial power spectrum, given the CAMB results for that spectrum
+    and its lensing power spectrum. This follows
+    `hd_pk.cmb_from_pk.calculate_theory_spectra`, but takes the lensing
+    spectrum and the lensing reconstruction noise as arguments instead of
+    calculating and loading them itself, so the lensing spectrum is
+    integrated once and the delensing uses the noise of the experiment
+    being forecast.
 
     Parameters
     ----------
@@ -171,7 +278,13 @@ def binned_pk_spectra(lmax, camb_results, clkk, cmb_types=['lensed', 'unlensed']
         spectrum, C_L^kk = [L(L+1)]^2 C_L^phiphi / 4, from L = 0 to at
         least the maximum multipole CAMB calculated.
     cmb_types : list of str, default=['lensed', 'unlensed']
-        Any of `'lensed'` and `'unlensed'`.
+        Any of `'lensed'`, `'unlensed'`, and `'delensed'`.
+    nlkk : array_like of float, default=None
+        The lensing reconstruction noise, in the same convention as `clkk`,
+        from L = 0 to at least `Lmax`. Needed for the delensed spectra.
+    Lmin, Lmax : int, default=None
+        The range of lensing multipoles used in the reconstruction. Needed
+        for the delensed spectra. `Lmax` defaults to `lmax`.
 
     Returns
     -------
@@ -183,7 +296,19 @@ def binned_pk_spectra(lmax, camb_results, clkk, cmb_types=['lensed', 'unlensed']
     ells = np.arange(lmax + 1)
     theo = {}
     for cmb_type in cmb_types:
-        cl = np.zeros_like(clkk) if (cmb_type == 'unlensed') else clkk
+        if cmb_type == 'lensed':
+            cl = clkk
+        elif cmb_type == 'unlensed':
+            cl = np.zeros_like(clkk)
+        elif cmb_type == 'delensed':
+            if (nlkk is None) or (Lmin is None):
+                raise ValueError("The delensed spectra need the lensing reconstruction noise `nlkk` and the minimum multipole `Lmin` of the reconstruction.")
+            if Lmax is None:
+                Lmax = lmax
+            # the lensing power left after the reconstruction is removed
+            cl = hdtheory.get_residual_lensing(clkk, nlkk, Lmin, Lmax, len(clkk) - 1)
+        else:
+            raise ValueError(f"cmb_types must contain only 'lensed', 'unlensed', or 'delensed', not {cmb_type!r}.")
         cls = camb_results.get_lensed_cls_with_spectrum(
             cl * 4 / (2 * np.pi), lmax=lmax, CMB_unit='muK', raw_cl=True)
         theo[cmb_type] = {'ells': ells.copy(), 'kk': clkk[:lmax+1].copy()}
@@ -231,9 +356,8 @@ class Theory(hdtheory.Theory):
         since the finite difference divides by that step. A warning is
         issued if the two disagree.
     hd_data_version : str, default='latest'
-        The version of the CMB-HD mock data, used for the kSZ template,
-        the BBN table CLASS reads, and the lensing reconstruction noise
-        `hd_pk` uses for the delensed binned P(k) spectra.
+        The version of the CMB-HD mock data, used for the kSZ template and
+        the BBN table CLASS reads.
 
     Notes
     -----
@@ -242,15 +366,20 @@ class Theory(hdtheory.Theory):
     by `1 + pk_frac_step` (or `1 - pk_frac_step`, if the value is below
     the fiducial one). The spectra are then calculated with CAMB and
     `hd_pk`, following MacInnis & Sehgal (2024). The lensing spectrum is
-    the `hd_pk` integral over the matter power spectrum, and the delensed
-    spectra come from `hd_pk.cmb_from_pk.calculate_theory_spectra`, which
-    delenses with the minimum-variance lensing reconstruction noise from
-    hdMockData rather than the `nlkk` passed here. Only one bin amplitude
-    can be varied at a time.
+    the `hd_pk` integral over the matter power spectrum, done once, and
+    the delensed spectra are made from it with the lensing reconstruction
+    noise `nlkk` passed here, in the same way hdfisher delenses a power
+    law. Only one bin amplitude can be varied at a time.
 
     The binned P(k) and kSZ entries of the parameters are taken out before
     the rest is handed to hdfisher, which sets up CAMB or CLASS as usual,
     with the spectra calculated to `lmax + 500` and kept to `lmax`.
+
+    CAMB 2.0.0 renamed the `lens_margin` setting to `lens_output_margin`.
+    The setting is renamed to match the installed version of CAMB (see
+    `camb_param_names`), so the parameter files work with either. The path
+    of the BBN table is given to CLASS in the form its version expects; see
+    `class_file_path`.
     """
 
     def __init__(self, lmax, output_dir, output_root=None, params=None,
@@ -274,8 +403,7 @@ class Theory(hdtheory.Theory):
         # way a bin amplitude has been varied:
         if params is None:
             params = param_file
-        self.fid_params = hdtheory.get_param_dict(param_dict_or_file=params,
-                                                  use_class=use_class)
+        self.fid_params = get_param_dict(params, use_class=use_class)
         self.ksz = ksz
         self.A_ksz = cosmo_params.pop('A_ksz', self.fid_params.get('A_ksz'))
         self.n_ksz = cosmo_params.pop('n_ksz', self.fid_params.get('n_ksz'))
@@ -300,10 +428,15 @@ class Theory(hdtheory.Theory):
         params = remove_extra_params(self.fid_params)
         overrides = remove_extra_params(cosmo_params)
         if self.use_class:
-            # CLASS reads the BBN table itself, so it needs the full path
+            # CLASS reads the BBN table itself, so it needs its location
             overrides.setdefault(
                 'sBBN file', hd_data.HDMockData(version=self.hd_data_version).class_sbbn_file)
+        else:
+            overrides = camb_param_names(overrides)
         super()._setup_boltzmann_params(params=params, use_H0=use_H0, **overrides)
+        if self.use_class:
+            # in the form the installed version of CLASS expects
+            self.class_params['sBBN file'] = class_file_path(self.class_params['sBBN file'])
         if self.binned_pk:
             self._find_varied_bin(cosmo_params)
 
@@ -337,9 +470,10 @@ class Theory(hdtheory.Theory):
 
     def get_binned_pk_results(self):
         """The CAMB results and the lensing power spectrum for the binned
-        primordial spectrum, calculated once and kept, along with the CAMB
-        parameters of the fiducial power law and the transfer function of
-        the varied bin that `hd_pk` takes."""
+        primordial spectrum, calculated once and kept. The lensing spectrum
+        is the `hd_pk` integral over the matter power spectrum, which is
+        slow, so it is done here once and used for the lensed and the
+        delensed spectra alike."""
         if self._binned_pk_results is None:
             effective_ns = self.fid_params.get('effective_ns_for_nonlinear')
             pars_fid, _ = binned_pk_camb_params(self.camb_params, effective_ns=effective_ns)
@@ -352,7 +486,7 @@ class Theory(hdtheory.Theory):
                     effective_ns=effective_ns)
             results = camb.get_results(pars)
             clkk = cmb_from_pk.calculate_clkk(pars_fid, pk_transfer_function=pk_transfer_function)
-            self._binned_pk_results = (results, clkk, pars_fid, pk_transfer_function)
+            self._binned_pk_results = (results, clkk)
         return self._binned_pk_results
 
 
@@ -362,15 +496,13 @@ class Theory(hdtheory.Theory):
         binned P(k), and with hdfisher otherwise. The kSZ template is added
         to TT if `ksz=True`."""
         if self.binned_pk:
-            results, clkk, pars_fid, pk_transfer_function = self.get_binned_pk_results()
-            theo = binned_pk_spectra(self.lmax, results, clkk,
-                                     cmb_types=[t for t in cmb_types if t != 'delensed'])
             if 'delensed' in cmb_types:
-                theo['delensed'] = cmb_from_pk.calculate_theory_spectra(
-                    self.lmax, pars_fid, camb_results=results,
-                    pk_transfer_function=pk_transfer_function,
-                    cmb_types=['delensed'],
-                    hd_data_version=self.hd_data_version)['delensed']
+                self.check_delensing_vars()
+            results, clkk = self.get_binned_pk_results()
+            # delensed with the lensing reconstruction noise passed at
+            # initialization, which is that of the experiment being forecast
+            theo = binned_pk_spectra(self.lmax, results, clkk, cmb_types=cmb_types,
+                                     nlkk=self.nlkk, Lmin=self.Lmin, Lmax=self.Lmax)
         else:
             # hdfisher's own calculation, with CAMB or CLASS, done fresh
             theo = {}
