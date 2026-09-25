@@ -21,15 +21,16 @@ To use this software, you must have Python (version 3.9 or later) installed, alo
 - [NumPy](https://numpy.org/)
 - [SciPy](https://scipy.org/)
 - [PyYAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
-- [CAMB](https://camb.readthedocs.io/en/latest/). Version 2.0.0 renamed the `lens_margin` setting to `lens_output_margin`. hdinitpk checks the installed version and uses the right name, so either version works. The Cobaya input files in `hdinitpk/cobaya_yaml_files` use `lens_margin` and need it renamed by hand for CAMB 2.0.0 or later.
+- [CAMB](https://camb.readthedocs.io/en/latest/)
+  - Note that in version 2.0.0, CAMB renamed the `lens_margin` parameter to `lens_output_margin`. `hdinitpk` checks the installed version and uses the right name, so either version works. The Cobaya input files in `hdinitpk/cobaya_yaml_files` use `lens_margin`, so you must edit them and rename this parameter if you are using CAMB version 2.0.0 or later.
 - [hdfisher](https://github.com/CMB-HD/hdfisher)
 - [hdMockData](https://github.com/CMB-HD/hdMockData), version `v1.2` or later. The CMB-HD theory spectra and bandpowers from CAMB and CLASS, the covariance matrices, the lensing reconstruction noise, and the CAMB and CLASS settings used here were added in v1.2.
 - [hdPk](https://github.com/CMB-HD/hdPk), which provides `cmb_from_pk`, used for the binned primordial power spectrum calculation
-- [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper `classy`, only needed to recompute the CLASS Fisher forecasts or to run the CLASS CMB-HD chains. CLASS has to be modified in two places before it is built, as described in Appendix A of Cheslog et al. (2026). The line numbers are for CLASS v3.3.4, the version used in Cheslog et al. (2026).
-  - `source/lensing.c`, line 124: declare `num_mu` and `index_mu` as `long long` and `icount` as `unsigned long long`, instead of `int`. Without this CLASS overflows at the multipoles used here and tries to allocate an array of negative size. In v3.4.0 the declarations are on lines 130 and 131, and `icount` is already `long long`.
-  - `source/input.c`, line 2470 (line 2548 in v3.4.0): comment out the `class_test` that stops CLASS when `Omega0_ur` is negative. The down step in `N_ur` takes it below zero; see [Running new Fisher forecasts](#running-new-fisher-forecasts).
-
-   From version 3.3.2 on, CLASS reads its data files relative to the directory `classy` is installed in. hdinitpk gives CLASS the path of the BBN table in the form the installed version expects (see `hdinitpk.theory.class_file_path`).
+- [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper `classy`, only needed to recompute the CLASS Fisher forecasts or to run the CLASS CMB-HD chains.
+  - **CLASS must to be modified** before it is built, as described here and in Appendix A of Cheslog et. al. (2026), when using the defaults set throughout `hdInitPk`. The line numbers below are for CLASS v3.3.4 (the version used in that work), and `$CLASS_DIR` refers to the path to the CLASS repository directory (named `class_public` by default):
+    - In `$CLASS_DIR/source/lensing.c`, line 124: declare both `num_mu` and `index_mu` as `long long`, and `icount` as `unsigned long long` (in version 3.3.4, all are originally `int`). Without this CLASS overflows at the multipoles used here and tries to allocate an array of negative size. In CLASS v3.4.0 the declarations are on lines 130 and 131, and `icount` is already `long long`.
+    - In `$CLASS_DIR/source/input.c`, line 2470 (line 2548 in v3.4.0): comment out the `class_test` that stops CLASS when `Omega0_ur` is negative. The down step in `N_ur` takes it below zero; see [Running new Fisher forecasts](#running-new-fisher-forecasts).
+    - You must place a copy of the `sBBN file`, provided [here](https://github.com/CMB-HD/hdMockData/blob/main/hd_mock_data/data/theory/PRIMAT_Yp_DH_ErrorMC_2021_CLASS.dat), in the `$CLASS_DIR/external/bbn/` directory. This is the file used in Cheslog et. al. (2026), and it is the default in `hdInitPk`.
 - [pandas](https://pandas.pydata.org/), [matplotlib](https://matplotlib.org/), and [getdist](https://getdist.readthedocs.io/en/latest/intro.html), only needed for the Jupyter notebooks
 - [Cobaya](https://cobaya.readthedocs.io/en/latest/), only needed to run new MCMC chains
 - [hdlike](https://github.com/CMB-HD/hdlike), only needed to run new CMB-HD MCMC chains
