@@ -17,11 +17,11 @@ To use this software, you must have Python (version 3.9 or later) installed, alo
 - [hdfisher](https://github.com/CMB-HD/hdfisher)
 - [hdMockData](https://github.com/CMB-HD/hdMockData), version `v1.2` or later. The CMB-HD theory spectra and bandpowers from CAMB and CLASS, the covariance matrices, the lensing reconstruction noise, and the CAMB and CLASS settings used here were added in v1.2.
 - [hdPk](https://github.com/CMB-HD/hdPk), which provides `cmb_from_pk`, used for the binned primordial power spectrum calculation
-- [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper `classy`, only needed to recompute the CLASS Fisher forecasts or to run the CLASS CMB-HD chains. CLASS has to be modified in two places before it is built, as described in Appendix A of the paper. The line numbers are for CLASS v3.3.4, the version used in the paper.
+- [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper `classy`, only needed to recompute the CLASS Fisher forecasts or to run the CLASS CMB-HD chains. CLASS has to be modified in two places before it is built, as described in Appendix A of Cheslog et al. (2026) . The line numbers are for CLASS v3.3.4, the version used in the paper.
   - `source/lensing.c`, line 124: declare `num_mu` and `index_mu` as `long long` and `icount` as `unsigned long long`, instead of `int`. Without this CLASS overflows at the multipoles used here and tries to allocate an array of negative size. In v3.4.0 the declarations are on lines 130 and 131, and `icount` is already `long long`.
   - `source/input.c`, line 2470 (line 2548 in v3.4.0): comment out the `class_test` that stops CLASS when `Omega0_ur` is negative. The down step in `N_ur` takes it below zero; see [Running new Fisher forecasts](#running-new-fisher-forecasts).
 
-  Both failures happen well into a run rather than at setup, so make the changes before starting anything. From version 3.3.2 on, CLASS reads its data files relative to the directory `classy` is installed in. hdinitpk gives CLASS the path of the BBN table in the form the installed version expects (see `hdinitpk.theory.class_file_path`).
+   From version 3.3.2 on, CLASS reads its data files relative to the directory `classy` is installed in. hdinitpk gives CLASS the path of the BBN table in the form the installed version expects (see `hdinitpk.theory.class_file_path`).
 - [pandas](https://pandas.pydata.org/), [matplotlib](https://matplotlib.org/), and [getdist](https://getdist.readthedocs.io/en/latest/intro.html), only needed for the Jupyter notebooks
 - [Cobaya](https://cobaya.readthedocs.io/en/latest/), only needed to run new MCMC chains
 - [hdlike](https://github.com/CMB-HD/hdlike), only needed to run new CMB-HD MCMC chains
@@ -70,7 +70,7 @@ Everything in the paper can be reproduced from what is here. The three tables be
 
 Table VI is a table of CAMB and CLASS computation times and is not reproduced by any of the above. Tables I and II are inputs rather than results. They give the $k$ bin centers and priors, and the fiducial parameters, step sizes and priors, which ship in `hdinitpk/data/fisher_fid_params` and `hdinitpk/data/fisher_steps`.
 
-# Reproducing the figures and tables
+# Reproducing the figures and tables of Cheslog et al. (2026)
 
 ## The plotting notebook
 
@@ -109,7 +109,7 @@ Set `CALCULATE_DERIVS = True` at the top of that file. Either way the derivative
 
 `run_hdInitPk_current.ipynb` walks through the twelve Cobaya runs behind the current-data constraints. It shows what each input file contains, which external likelihoods you need, how to fill in the `/path/to/...` placeholders, the exact command for each run, and how to turn the finished chains into Table III and the marginalized binned-$\mathcal{P}(k)$ statistics of Table VIII. The chains and cached results go to `hdinitpk/data/user_generated_data`, in the layout the plotting notebook reads.
 
-## Figure 6 and Figure 8
+## Reproducing Figure 6 and Figure 8 of Cheslog et al. (2026)
 
 Two results come from scripts rather than the plotting notebook.
 
@@ -168,7 +168,7 @@ where `mcmc_runs/` is the directory of prepared copies that `run_hdInitPk_curren
 
 Each file's `sampler.mcmc.covmat` points at a proposal covariance in `hdinitpk/data/proposal_matrices/`, built from that run's own converged chain. These ship with the package.
 
-## External likelihoods
+## External likelihoods used
 
 These are not dependencies of `hdinitpk` itself. Install only the ones the runs you want require. The *Planck* low-$\ell$ and DESI BAO likelihoods are built into Cobaya and need no separate installation, though Cobaya must download their data (`cobaya-install`).
 
@@ -182,7 +182,7 @@ These are not dependencies of `hdinitpk` itself. Install only the ones the runs 
 | `planck_2018_lowl.TT`, `planck_2018_lowl.EE_sroll2` | *Planck* 2018 low-$\ell$ TT and the `sroll2` low-$\ell$ EE reanalysis | built into Cobaya ([likelihood docs](https://cobaya.readthedocs.io/en/latest/likelihood_planck.html)) |
 | `bao.desi_dr2.desi_bao_all`, `bao.desi_2024_bao_all` | DESI DR2 and DESI 2024 (DR1) BAO | built into Cobaya ([likelihood docs](https://cobaya.readthedocs.io/en/latest/likelihood_bao.html)) |
 | `hdlike.hdlike.HDLike` | the CMB-HD mock likelihood, used only by the `HD/` files | [CMB-HD/hdlike](https://github.com/CMB-HD/hdlike) |
-| `bao.generic` | the CMB-HD mock DESI BAO data, used only by the `HD/` files | ships with [CMB-HD/hdlike](https://github.com/CMB-HD/hdlike) |
+| `bao.generic` | the CMB-HD mock DESI BAO data, used only by the `HD/` files | the data we use ships with [CMB-HD/hdlike](https://github.com/CMB-HD/hdlike) |
 
 Two theory-side requirements are worth calling out.
 
