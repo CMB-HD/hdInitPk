@@ -22,7 +22,7 @@ To use this software, you must have Python (version 3.9 or later) installed, alo
 - [SciPy](https://scipy.org/)
 - [PyYAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
 - [CAMB](https://camb.readthedocs.io/en/latest/)
-  - Note that in version 2.0.0, CAMB renamed the `lens_margin` parameter to `lens_output_margin`. `hdinitpk` checks the installed version and uses the right name, so either version works. The Cobaya input files in `hdinitpk/cobaya_yaml_files` use `lens_margin`, so you must edit them and rename this parameter if you are using CAMB version 2.0.0 or later.
+  - Note that in version 2.0.0, CAMB renamed the `lens_margin` parameter to `lens_output_margin`. `hdinitpk` renames the setting to the name hdMockData uses for the installed version of CAMB, keeping its value, so either version works. The Cobaya input files in `hdinitpk/cobaya_yaml_files` use `lens_margin`, so you must edit them and rename this parameter if you are using CAMB version 2.0.0 or later.
 - [hdfisher](https://github.com/CMB-HD/hdfisher)
 - [hdMockData](https://github.com/CMB-HD/hdMockData), version `v1.2` or later. The CMB-HD theory spectra and bandpowers from CAMB and CLASS, the covariance matrices, the lensing reconstruction noise, and the CAMB and CLASS settings used here were added in v1.2.
 - [hdPk](https://github.com/CMB-HD/hdPk), which provides `cmb_from_pk`, used for the binned primordial power spectrum calculation
@@ -196,7 +196,7 @@ These are not dependencies of `hdinitpk` itself. Install only the ones the runs 
 Two theory-side requirements are worth calling out.
 
 - Every current-data file sets `recombination_model: CosmoRec`. CAMB must be built against [CosmoRec](https://www.jb.man.ac.uk/~jchluba/Science/CosmoRec/CosmoRec.html), which is not the default. See CAMB's [recombination models](https://camb.readthedocs.io/en/latest/recombination.html) documentation.
-- `HD/class_*_likelihood.yaml` use `classy` rather than `camb`, so they need [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper, modified as described under [Requirements](#requirements) (Appendix A of Cheslog et al. 2026). The BBN table those files point at ships with hdMockData, so the `/path/to/hdMockData` placeholder in them must point at your hdMockData directory. With CLASS 3.3.2 or later, which reads the path relative to the directory `classy` is installed in, use the path that `hdinitpk.theory.class_file_path` returns for it. They set `use_class: True` so that hdlike compares the theory to the CMB-HD bandpowers calculated with CLASS, which also come from hdMockData.
+- `HD/class_*_likelihood.yaml` use `classy` rather than `camb`, so they need [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper, modified as described under [Requirements](#requirements) (Appendix A of Cheslog et al. 2026). They use the BBN table that ships with hdMockData, at the path hdMockData gives, so it must be copied to the `external/bbn` directory of CLASS as described under [Requirements](#requirements). hdlike sees that CLASS is used and compares the theory to the CMB-HD bandpowers calculated with CLASS, which also come from hdMockData.
 
 # Running a binned primordial P(k) with arbitrary binning
 

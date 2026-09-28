@@ -80,43 +80,44 @@ def use_class_flag(use_class_or_camb):
     return code == 'class'
 
 
-def camb_param_names(params):
-    """A copy of the `params` dict with the CAMB settings named the way the
-    installed version of CAMB names them.
+# CAMB 2.0.0 renamed `lens_margin` to `lens_output_margin`.
+LENS_MARGIN_NAMES = ['lens_margin', 'lens_output_margin']
 
-    CAMB 2.0.0 renamed `lens_margin` to `lens_output_margin`. The parameter
-    files provided with hdinitpk use the old name. This renames it for CAMB
-    2.0.0 or later, and renames the new one back for older versions, so
-    either name works with either version. It is the same check hdMockData
-    makes to choose between its CAMB parameter files.
+
+def camb_param_names(params, hd_data_version='latest'):
+    """A copy of the `params` dict with the CAMB lens margin setting under
+    the name hdMockData uses, which is the one the installed version of
+    CAMB takes. The value given in `params` is kept.
 
     Parameters
     ----------
     params : dict
         A dictionary of parameter names and values.
+    hd_data_version : str, default='latest'
+        The version of the CMB-HD mock data whose CAMB settings give the
+        name.
 
     Returns
     -------
     dict
-        A copy with the renamed entry. If both names are present, the one
-        the installed CAMB takes is kept.
+        A copy with the setting renamed. If `params` has neither name, or
+        both, it is returned unchanged.
     """
-    old, new = 'lens_margin', 'lens_output_margin'
-    use_new = int(camb.__version__.split('.')[0]) >= 2
-    wanted, unwanted = (new, old) if use_new else (old, new)
     params = dict(params)
-    if unwanted in params:
-        value = params.pop(unwanted)
-        if wanted not in params:
-            params[wanted] = value
+    given = [name for name in LENS_MARGIN_NAMES if name in params]
+    if len(given) != 1:
+        return params
+    hd_settings = hd_data.HDMockData(version=hd_data_version).camb_settings()
+    wanted = [name for name in LENS_MARGIN_NAMES if name in hd_settings][0]
+    params[wanted] = params.pop(given[0])
     return params
 
 
-def get_param_dict(params=None, use_class=False):
+def get_param_dict(params=None, use_class=False, hd_data_version='latest'):
     """The dictionary of parameter names and values that hdfisher builds
-    from a dictionary or a YAML file (with its parameter aliases added),
-    with the CAMB settings renamed for the installed version of CAMB; see
-    `camb_param_names`.
+    from a dictionary or a YAML file (with its parameter aliases added).
+    For CAMB, the lens margin setting is renamed to the name the installed
+    version of CAMB takes; see `camb_param_names`.
 
     Parameters
     ----------
@@ -125,6 +126,8 @@ def get_param_dict(params=None, use_class=False):
         file holding them. If `None`, hdfisher's fiducial parameters.
     use_class : bool, default=False
         Whether the parameters are for CLASS instead of CAMB.
+    hd_data_version : str, default='latest'
+        The version of the CMB-HD mock data used to name the CAMB setting.
 
     Returns
     -------
@@ -133,53 +136,8 @@ def get_param_dict(params=None, use_class=False):
     """
     param_dict = hdtheory.get_param_dict(param_dict_or_file=params, use_class=use_class)
     if (param_dict is not None) and (not use_class):
-        param_dict = camb_param_names(param_dict)
+        param_dict = camb_param_names(param_dict, hd_data_version=hd_data_version)
     return param_dict
-
-
-def class_file_path(path):
-    """The form in which to give CLASS the path of a data file it opens
-    itself, such as the BBN table (`'sBBN file'`).
-
-    Up to version 3.3.1, CLASS opens the path it is given as it is, so an
-    absolute path works. From version 3.3.2 on, CLASS puts its `base_path`
-    in front of the path of every data file it opens, and classy sets
-    `base_path` to the directory classy is installed in. An absolute path
-    then ends up inside that directory, and CLASS cannot find the file. For
-    those versions the path is given relative to the classy directory,
-    starting with '/', which is the form CLASS's own default paths take
-    (for example '/external/bbn/sBBN_2025.dat').
-
-    Parameters
-    ----------
-    path : str
-        The path to the file, absolute or relative to the current directory.
-
-    Returns
-    -------
-    str
-        The path to pass to CLASS. It is returned unchanged if classy is not
-        installed, or if its version is older than 3.3.2.
-    """
-    try:
-        import classy
-    except ImportError:
-        return path
-    version = str(getattr(classy, '__version__', '')).lstrip('v')
-    try:
-        version = tuple(int(n) for n in version.split('.')[:3])
-    except ValueError:
-        return path
-    if version < (3, 3, 2):
-        return path
-    # the directory classy uses as `base_path`, found the same way classy does
-    try:
-        import importlib.resources
-        base_path = os.path.abspath(str(importlib.resources.files('classy')))
-    except Exception:
-        base_path = os.path.dirname(os.path.abspath(classy.__file__))
-    relative = os.path.relpath(os.path.abspath(path), base_path)
-    return '/' + relative.replace(os.sep, '/')
 
 
 def remove_extra_params(params):
@@ -357,7 +315,7 @@ class Theory(hdtheory.Theory):
         issued if the two disagree.
     hd_data_version : str, default='latest'
         The version of the CMB-HD mock data, used for the kSZ template and
-        the BBN table CLASS reads.
+        to name the CAMB lens margin setting.
 
     Notes
     -----
@@ -376,10 +334,8 @@ class Theory(hdtheory.Theory):
     with the spectra calculated to `lmax + 500` and kept to `lmax`.
 
     CAMB 2.0.0 renamed the `lens_margin` setting to `lens_output_margin`.
-    The setting is renamed to match the installed version of CAMB (see
-    `camb_param_names`), so the parameter files work with either. The path
-    of the BBN table is given to CLASS in the form its version expects; see
-    `class_file_path`.
+    The setting is given the name hdMockData uses for the installed version
+    of CAMB, with the value from the parameters; see `camb_param_names`.
     """
 
     def __init__(self, lmax, output_dir, output_root=None, params=None,
@@ -403,7 +359,8 @@ class Theory(hdtheory.Theory):
         # way a bin amplitude has been varied:
         if params is None:
             params = param_file
-        self.fid_params = get_param_dict(params, use_class=use_class)
+        self.fid_params = get_param_dict(params, use_class=use_class,
+                                         hd_data_version=hd_data_version)
         self.ksz = ksz
         self.A_ksz = cosmo_params.pop('A_ksz', self.fid_params.get('A_ksz'))
         self.n_ksz = cosmo_params.pop('n_ksz', self.fid_params.get('n_ksz'))
@@ -427,16 +384,9 @@ class Theory(hdtheory.Theory):
             raise ValueError("The binned P(k) is only calculated with CAMB; set `use_class_or_camb='camb'`.")
         params = remove_extra_params(self.fid_params)
         overrides = remove_extra_params(cosmo_params)
-        if self.use_class:
-            # CLASS reads the BBN table itself, so it needs its location
-            overrides.setdefault(
-                'sBBN file', hd_data.HDMockData(version=self.hd_data_version).class_sbbn_file)
-        else:
-            overrides = camb_param_names(overrides)
+        if not self.use_class:
+            overrides = camb_param_names(overrides, hd_data_version=self.hd_data_version)
         super()._setup_boltzmann_params(params=params, use_H0=use_H0, **overrides)
-        if self.use_class:
-            # in the form the installed version of CLASS expects
-            self.class_params['sBBN file'] = class_file_path(self.class_params['sBBN file'])
         if self.binned_pk:
             self._find_varied_bin(cosmo_params)
 

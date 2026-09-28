@@ -87,8 +87,9 @@ class Fisher(hdfisher_fisher.Fisher):
     multipole range of the experiment.
 
     The parameter files provided with hdinitpk use the CAMB 1.x name
-    `lens_margin`. The entry is renamed to `lens_output_margin` when CAMB
-    2.0.0 or later is installed; see `hdinitpk.theory.camb_param_names`.
+    `lens_margin`. The setting is given the name hdMockData uses for the
+    installed version of CAMB, with its value kept; see
+    `hdinitpk.theory.camb_param_names`.
 
     If no fiducial parameters or step sizes are given (as `fiducial_params`
     or `param_file`, and `step_sizes` or `fisher_steps_file`), the copies
@@ -133,8 +134,8 @@ class Fisher(hdfisher_fisher.Fisher):
     def _get_fid_params(self, fiducial_params=None, param_file=None, feedback=False):
         """The fiducial parameters: the ones passed, or else the copy saved
         in `fisher_dir` by an earlier run, or else the file provided with
-        hdinitpk for this Boltzmann code. The CAMB settings are named for
-        the installed version of CAMB."""
+        hdinitpk for this Boltzmann code. The CAMB lens margin setting is
+        named for the installed version of CAMB."""
         if (fiducial_params is None) and (param_file is None):
             saved = self.param_file_name()
             if os.path.exists(saved) and (not self.overwrite):
@@ -143,7 +144,8 @@ class Fisher(hdfisher_fisher.Fisher):
                 param_file = fiducial_param_file(use_class_or_camb=self.use_class_or_camb,
                                                  feedback=feedback)
         params = fiducial_params if (fiducial_params is not None) else param_file
-        return theory.get_param_dict(params, use_class=self.use_class)
+        return theory.get_param_dict(params, use_class=self.use_class,
+                                     hd_data_version=self.hd_data_version)
 
 
     def _get_step_sizes(self, step_sizes=None, fisher_steps_file=None):

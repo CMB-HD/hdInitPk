@@ -2,7 +2,7 @@
 # From Planck 2018 TT,TE,EE + lowl + lowE + lensing, matching the CAMB file.
 omega_b: 0.02237          # was ombh2
 omega_cdm: 0.1200         # was omch2
-theta_s_100: 1.04071      # was theta
+theta_s_100: 1.041697     # 100 theta_s from CLASS for H0 = 67.36 (hdMockData v1.2)
 tau_reio: 0.0544          # was tau
 n_s: 0.9649               # was ns
 alpha_s: 0.0              # was nrun
@@ -68,9 +68,10 @@ recombination: 'recfast'
 YHe: 'BBN'
 T_cmb: 2.7255
 
-# The BBN table (`sBBN file`) is the PRIMAT 2021 table provided with
-# hdMockData. `hdinitpk.theory.Theory` fills in its path, since CLASS
-# reads the file itself and needs the full path.
+# The BBN table is the PRIMAT 2021 table provided with hdMockData. The
+# path is relative to the CLASS directory, as in hdMockData, so the file
+# has to be copied to the `external/bbn` directory of CLASS (see the README).
+sBBN file: /external/bbn/PRIMAT_Yp_DH_ErrorMC_2021_CLASS.dat
 
 
 # ----- accuracy settings -----

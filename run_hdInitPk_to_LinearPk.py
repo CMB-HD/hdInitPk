@@ -280,7 +280,7 @@ def make_camb_params_fisher(ombh2, omch2, H0, tau):
     pars.set_matter_power(redshifts=[0.0], kmax=100, k_per_logint=130)
     # `lens_margin` is called `lens_output_margin` from CAMB 2.0.0 on
     pars.set_for_lmax(LMAX + 500, lens_potential_accuracy=30,
-                      **camb_param_names({'lens_margin': 2050}))
+                      **camb_param_names({'lens_margin': 2050}, hd_data_version=hd_data_version))
     pars.set_accuracy(**LISTING1_ACCURACY)
     pars.NonLinear = camb.model.NonLinear_both
     pars.NonLinearModel.set_params('mead2016')
@@ -298,7 +298,7 @@ def make_camb_params_chain(ombh2, omch2, H0, tau):
         As=_AS_FID, ns=_NS_FID, pivot_scalar=_K_PIVOT,
         redshifts=[0.0], WantCls=False, WantTransfer=True,
         lmax=LMAX,   # lens_potential_accuracy/lens_margin act through lmax
-        **camb_param_names(CHAIN_CAMB_ACCURACY_SETTINGS),
+        **camb_param_names(CHAIN_CAMB_ACCURACY_SETTINGS, hd_data_version=hd_data_version),
     )
     return pars
 
