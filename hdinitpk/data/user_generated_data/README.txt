@@ -18,10 +18,8 @@ scripts and notebooks fill it in as you run them.
                                      named after the input file.
     cached_results/<name>.txt        Statistics computed from those chains.
     plin_z0/                         P_lin(k, z=0) samples from
-                                     run_hdInitPk_to_LinearPk.py, for
-                                     Figure 6.
-    resolved_params/                 Copies of the CLASS parameter files
-                                     with the sBBN table path filled in.
+                                     run_hdInitPk_to_LinearPk.py.
+    fig6/                            The Figure 6 points made from them.
 
 To use what you have generated instead of what ships with the package, set
 

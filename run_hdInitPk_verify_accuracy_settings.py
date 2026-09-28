@@ -16,7 +16,9 @@ lens_potential_accuracy and CLASS's P_k_max_h/Mpc) against a high-accuracy
 CAMB reference spectrum. The grid spectra, the reference, and the
 eight-parameter Fisher matrices ship with the package in hdinitpk/data. The
 bias calculation fixes the running, which is why it uses the
-eight-parameter matrices.
+eight-parameter matrices. The binning and the covariance matrix come from
+hdMockData. Set RECALCULATE_SPECTRA = True to calculate the grid spectra
+and the reference again instead of reading the shipped ones.
 
 The one input that does not ship is the Fisher derivatives, which are far
 too large. The script reads the CAMB and CLASS nine-parameter derivatives
@@ -39,6 +41,7 @@ from hdfisher import fisher, utils, mpi
 from hd_mock_data import hd_data
 
 import hdinitpk
+from hdinitpk import hdinitPkfisher, theory
 
 
 # The derivative directories. These default to where the forecast script
@@ -49,6 +52,17 @@ CLASS_DERIV_DIR = hdinitpk.user_data_path('fisher_derivs', 'class_9param')
 # Draw the Figure 8 plot at the end (needs matplotlib).
 MAKE_FIGURE = True
 SAVE_FIGURE = True
+
+# Recalculate the spectra used in the bias calculation (the CAMB and CLASS
+# accuracy grids and the high-accuracy CAMB reference) instead of reading
+# the ones that ship with the package. The grids use the fiducial CAMB and
+# CLASS settings with one accuracy setting varied at a time, and the
+# reference uses the CAMB settings with the changes in
+# TRUE_UNIVERSE_SETTINGS below, as in Appendix A. This is slow (the reference
+# alone takes hours), so the calculations are spread over the MPI ranks.
+# The spectra are written to hdinitpk/data/user_generated_data/spectra_for_bias
+# and read from there.
+RECALCULATE_SPECTRA = False
 
 
 # ----------------------------------------------------------------------
@@ -70,6 +84,14 @@ SPECTRA_LMAX = 24000
 lens_potential_values = [8, 10, 15, 20, 25, 30, 35, 40]   # CAMB
 P_k_max_values = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]  # CLASS
 
+# the settings of the high-accuracy CAMB reference, on top of the fiducial
+# CAMB settings
+TRUE_UNIVERSE_SETTINGS = {'AccuracyBoost': 3.0, 'lAccuracyBoost': 5.0,
+                          'lens_potential_accuracy': 40, 'lSampleBoost': 5.0}
+
+# the columns of the spectra files, starting at ell = 0
+SPECTRA_COLS = ['tt', 'te', 'ee', 'bb', 'kk']
+
 # the bias calculation fixes the running, so eight parameters:
 eight_params = ['mnu', 'tau', 'logA', 'H0', 'ombh2', 'omch2', 'ns', 'nnu']
 
@@ -79,12 +101,11 @@ eight_params = ['mnu', 'tau', 'logA', 'H0', 'ombh2', 'omch2', 'ns', 'nnu']
 camb_to_class_fisher_params = {
     'ombh2': 'omega_b', 'omch2': 'omega_cdm', 'theta': 'theta_s_100',
     'tau': 'tau_reio', 'logA': 'ln_A_s_1e10', 'As': 'A_s', 'ns': 'n_s',
-    'H0': 'H0', 'nnu': 'Neff', 'mnu': 'sum_m_ncdm', 'nrun': 'alpha_s',
+    'H0': 'H0', 'nnu': 'N_ur', 'mnu': 'sum_m_ncdm', 'nrun': 'alpha_s',
     'omk': 'Omega_k', 'w': 'w0_fld', 'wa': 'wa_fld',
     'HMCode_logT_AGN': 'log10T_heat_hmcode',
 }
 class_to_camb_fisher_params = {v: k for k, v in camb_to_class_fisher_params.items()}
-class_to_camb_fisher_params['Neff'] = 'nnu'
 
 
 def from_class_fisher(result):
@@ -163,36 +184,57 @@ def bin_spec(cl, matrix, lmax):
 # Loading the inputs.
 # ======================================================================
 
-def steps(name):
-    return hdinitpk.data_path('fisher_steps', name)
+def spectra_fname(spectra_path, code, value=None):
+    """The file holding one set of spectra: the CAMB reference (`code`
+    `'true'`), or the CAMB or CLASS spectra at one accuracy setting."""
+    if code == 'true':
+        return os.path.join(spectra_path,
+                            f'lensed_lmax={SPECTRA_LMAX}_true_universe_spectra.txt')
+    if code == 'camb':
+        return os.path.join(spectra_path, 'camb',
+                            f'lensed_lmax={SPECTRA_LMAX}_lens_potential_accuracy={value}'
+                            '_camb_spectra.txt')
+    return os.path.join(spectra_path, 'class',
+                        f'lensed_lmax={SPECTRA_LMAX}_P_k_max_h_Mpc={value}'
+                        '_class_spectra.txt')
 
 
-def params(name):
-    """A fiducial-parameter file from the package. The CLASS file names the
-    sBBN table, and CLASS opens that file itself, so the `/path/to/hdInitPk`
-    placeholder in the shipped copy is replaced with a real path in a copy
-    under user_generated_data. Only rank 0 writes it."""
-    src = hdinitpk.data_path('fisher_fid_params', name)
-    with open(src, encoding='utf-8') as f:
-        text = f.read()
-    placeholder = '/path/to/hdInitPk/hdinitpk/data'
-    if placeholder not in text:
-        return src
-    out = hdinitpk.user_data_path('resolved_params', name)
-    if mpi.rank == 0:
-        with open(out, 'w', encoding='utf-8') as f:
-            f.write(text.replace(placeholder, hdinitpk.DATA_DIR))
+def calculate_spectra(spectra_path):
+    """Calculate the lensed spectra used in the bias calculation with
+    `hdinitpk.theory.Theory`, one setting at a time, spread over the MPI
+    ranks, and save each as five columns (TT, TE, EE, BB, kk) from
+    ell = 0 to `SPECTRA_LMAX`."""
+    for sub in ['camb', 'class']:
+        os.makedirs(os.path.join(spectra_path, sub), exist_ok=True)
+    tasks = ([('true', None)] + [('camb', p) for p in lens_potential_values]
+             + [('class', p) for p in P_k_max_values])
+    for i in mpi.distribute(len(tasks), mpi.size, mpi.rank):
+        code, value = tasks[i]
+        print(f'[rank {mpi.rank}] calculating {code} spectra'
+              + ('' if value is None else f' at {value}'), flush=True)
+        if code == 'class':
+            theolib = theory.Theory(
+                SPECTRA_LMAX, spectra_path, use_class_or_camb='class',
+                param_file=hdinitPkfisher.fiducial_param_file(use_class_or_camb='class'),
+                **{'P_k_max_h/Mpc': value})
+        else:
+            settings = (TRUE_UNIVERSE_SETTINGS if code == 'true'
+                        else {'lens_potential_accuracy': value})
+            theolib = theory.Theory(
+                SPECTRA_LMAX, spectra_path,
+                param_file=hdinitPkfisher.fiducial_param_file(), **settings)
+        spectra = theolib.get_theory(cmb_types=['lensed'])['lensed']
+        utils.save_to_file(spectra_fname(spectra_path, code, value), spectra,
+                           keys=SPECTRA_COLS)
     mpi.comm.barrier()
-    return out
 
 
 def ensure_derivs(fisherlib, label):
     """Calculate the derivatives in `fisherlib`'s directory if there are
     none there yet that match `use_H0`. Runs on every rank, so that the
     calculation is shared under MPI."""
-    from hdfisher.fisher import get_available_cmb_fisher_derivs
-    cmb_types, found = get_available_cmb_fisher_derivs(fisherlib.derivs_dir,
-                                                       use_H0=use_H0)
+    cmb_types, found = fisher.get_available_cmb_fisher_derivs(fisherlib.derivs_dir,
+                                                              use_H0=use_H0)
     if cmb_types and found:
         if mpi.rank == 0:
             print(f'  {label}: {len(found)} parameters found in '
@@ -209,22 +251,29 @@ def load_inputs():
     """Build the Fisher libraries, calculate the derivatives if they are
     not there, then (on rank 0) load the derivatives, the Fisher matrices,
     the covariance matrix, and the spectra. Returns None on other ranks."""
-    # `overwrite=False`, so that existing derivatives are reused.
-    camb_fisherlib = fisher.Fisher(
-        CAMB_DERIV_DIR, overwrite=False, use_H0=use_H0, use_class=False,
-        hd_data_version=hd_data_version,
-        fisher_steps_file=steps('camb_fiducial_step_sizes.yaml'),
-        param_file=params('camb_fiducial_params.yaml'))
-    class_fisherlib = fisher.Fisher(
-        CLASS_DERIV_DIR, overwrite=False, use_H0=use_H0, use_class=True,
-        hd_data_version=hd_data_version,
-        fisher_steps_file=steps('class_fiducial_step_sizes.yaml'),
-        param_file=params('class_fiducial_params.yaml'))
+    # `overwrite=False`, so that existing derivatives are reused. With no
+    # parameter or step-size file given, these use the CAMB and CLASS
+    # nine-parameter files provided with hdinitpk, the same ones the
+    # forecast script uses.
+    camb_fisherlib = hdinitPkfisher.Fisher(
+        CAMB_DERIV_DIR, overwrite=False, use_H0=use_H0, use_class_or_camb='camb',
+        hd_data_version=hd_data_version)
+    class_fisherlib = hdinitPkfisher.Fisher(
+        CLASS_DERIV_DIR, overwrite=False, use_H0=use_H0, use_class_or_camb='class',
+        hd_data_version=hd_data_version)
 
     if mpi.rank == 0:
         print('Fisher derivatives:', flush=True)
     ensure_derivs(camb_fisherlib, 'CAMB')
     ensure_derivs(class_fisherlib, 'CLASS')
+
+    # Spectra: the high-accuracy CAMB reference, and the two accuracy grids.
+    # These ship with the package, or are calculated here if asked.
+    if RECALCULATE_SPECTRA:
+        spectra_path = hdinitpk.user_data_path('spectra_for_bias')
+        calculate_spectra(spectra_path)
+    else:
+        spectra_path = hdinitpk.data_path('spectra_for_bias')
     if mpi.rank != 0:
         return None
 
@@ -248,37 +297,12 @@ def load_inputs():
     hd_datalib = hd_data.HDMockData(version=hd_data_version)
     binning_matrix = hd_datalib.binning_matrix(lmin=30, lmax=BIAS_LMAX)
     covmat = hd_datalib.block_covmat('lensed')
-    expected = 5 * binning_matrix.shape[0]
-    print(f'covariance matrix: {covmat.shape}, expected '
-          f'({expected}, {expected})')
-    if covmat.shape != (expected, expected):
-        raise ValueError(
-            f'{hd_datalib.block_covmat_fname("lensed")} has shape '
-            f'{covmat.shape}, but the binned spectrum vector built by '
-            f'`order_spectra` has length {expected} (5 spectra x '
-            f'{binning_matrix.shape[0]} bins). Check that the covmat '
-            'matches lmin=30, lmax=%d.' % BIAS_LMAX)
 
-    # Spectra: the high-accuracy CAMB reference, and the two accuracy grids.
-    # All three ship with the package.
-    spectra_path = hdinitpk.data_path('spectra_for_bias')
-    cols = ['tt', 'te', 'ee', 'bb', 'kk']
-    true_spectra = utils.load_from_file(
-        os.path.join(spectra_path,
-                     f'lensed_lmax={SPECTRA_LMAX}_true_universe_spectra.txt'),
-        cols)
-    camb_spectra = {
-        p: utils.load_from_file(os.path.join(
-            spectra_path, 'camb',
-            f'lensed_lmax={SPECTRA_LMAX}_lens_potential_accuracy={p}'
-            '_camb_spectra.txt'), cols)
-        for p in lens_potential_values}
-    class_spectra = {
-        p: utils.load_from_file(os.path.join(
-            spectra_path, 'class',
-            f'lensed_lmax={SPECTRA_LMAX}_P_k_max_h_Mpc={p}'
-            '_class_spectra.txt'), cols)
-        for p in P_k_max_values}
+    true_spectra = utils.load_from_file(spectra_fname(spectra_path, 'true'), SPECTRA_COLS)
+    camb_spectra = {p: utils.load_from_file(spectra_fname(spectra_path, 'camb', p), SPECTRA_COLS)
+                    for p in lens_potential_values}
+    class_spectra = {p: utils.load_from_file(spectra_fname(spectra_path, 'class', p), SPECTRA_COLS)
+                     for p in P_k_max_values}
 
     return dict(camb_derivs=camb_derivs, class_derivs=class_derivs,
                 camb_fisher_8=camb_fisher_8, class_fisher_8=class_fisher_8,

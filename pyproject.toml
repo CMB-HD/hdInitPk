@@ -13,8 +13,8 @@ dependencies = [
     "pyyaml",
     "camb",
     # The following are installed from their GitHub repositories
-    "hdfisher",       # requires the version with the subclass seams (_compute_spectra etc.)
-    "hd_mock_data",   
+    "hdfisher",
+    "hd_mock_data",   # version v1.2 or later
     "hd_pk",          # required for the binned-Pk calculation (cmb_from_pk)
 ]
 

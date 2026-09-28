@@ -1,8 +1,25 @@
 # hdInitPk
 
-This repository contains the code used in the analysis and forecasts of [Cheslog, Finson, MacInnis, Sehgal, Afshordi, Nerval, and Hložek (2026)](https://arxiv.org/abs/XXXX.XXXXX). (TO DO: add archive number) Please cite that work if you use this software or the associated data.
+This repository contains the code used in the analysis and forecasts of [Cheslog, Finson, MacInnis, Sehgal, Afshordi, Nerval, and Hložek (2026)](https://arxiv.org/abs/XXXX.XXXXX). Please cite that work if you use this software or the associated data.
 
-We constrain the primordial scalar power spectrum $\mathcal{P}(k)$ both as a power law, with an amplitude $A_\mathrm{s}$, spectral index $n_\mathrm{s}$, and running $\alpha_\mathrm{s}$, and as a general binned function of wavenumber. The current constraints come from *Planck* 2018, ACT DR6, SPT-3G D1, and the joint ACT-*Planck*-SPT (APS) CMB lensing reconstruction (the combination we call CMB-PAS), together with DESI DR2 BAO. We also forecast the constraints achievable with SO-like and CMB-HD-like surveys.
+The code and additional files provided here can be used to obtain cosmological parameter constraints from current CMB and BAO data by running MCMC chains, and to obtain projected constraints from mock CMB and BAO data with Fisher forecasts. In particular, we provide [Cobaya](https://cobaya.readthedocs.io) input YAML files that use *Planck*, ACT, SPT, and DESI data and associated likelihoods, and we provide code that can be used to calculate Fisher matrices with mock CMB-HD, SO, and DESI data. These current and projected parameter constraints can be obtained by using either CAMB or CLASS for the theory calculations.
+
+We provide two ways to model the primordial scalar power spectrum $\mathcal{P}(k)$, along with methods to constrain the parameters of each model using current or future data:
+1. As a power law with amplitude $A_\mathrm{s}$, spectral index $n_\mathrm{s}$, and a running of the spectral index $\alpha_\mathrm{s} \equiv d n_\mathrm{s}/d \mathrm{ln}k$ (this is the default in CAMB and CLASS), or
+2. As a general binned function of wavenumber $k$ for any choice of binning; in this case, the parameters $A_\mathrm{s}$, $n_\mathrm{s}$, $\alpha_\mathrm{s}$ are replaced by the amplitudes $\{\mathcal{P}(k_i)\}$ at the bin centers $\{k_i\}$. (This feature is only available for CAMB).
+
+We also provide methods to:
+- Calculate lensed CMB power spectra and the CMB lensing power spectrum for a given set of cosmological parameters using either CAMB or CLASS; by default, we use accuracy settings that produce agreement between the two codes to within 0.5%
+- Calculate lensed and delensed CMB power spectra, along with the CMB lensing power spectrum, from CAMB, using either a power law or a general binned $\mathcal{P}(k)$
+- Constrain a binned $\mathcal{P}(k)$ for any choice of binning:
+  - By running MCMC chains using a modified version of the Cobaya theory class `BinnedPk` (provided here), along with any (current or future) CMB and BAO data and likelihoods available to Cobaya
+  - By calculating a Fisher matrix where the amplitudes of the $\mathcal{P}(k)$ bins are treated as varied parameters
+- Convert constraints on the primordial $\mathcal{P}(k)$ into constraints on the linear matter power spectrum today, $P_\mathrm{lin}(k, z=0)$, from either Fisher forecasts or MCMC chains.
+- Marginalize over baryonic feedback effects and, for Fisher forecasts, a kSZ power spectrum template parameterized by its amplitude and slope
+- Calculate the expected bias on inferred parameter values due to insufficient CAMB or CLASS accuracy settings
+- Generate the figures and tables of Cheslog et al. (2026).
+
+We also provide the Cobaya input files, the thinned MCMC chains, and the Fisher matrices used in Cheslog et al. (2026), along with notebooks and scripts that reproduce its results; see [What is in this repository](#what-is-in-this-repository).
 
 # Installation
 
@@ -14,14 +31,19 @@ To use this software, you must have Python (version 3.9 or later) installed, alo
 - [SciPy](https://scipy.org/)
 - [PyYAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
 - [CAMB](https://camb.readthedocs.io/en/latest/)
+  - Note that in version 2.0.0, CAMB renamed the `lens_margin` parameter to `lens_output_margin`. `hdinitpk` renames the setting to the name hdMockData uses for the installed version of CAMB, keeping its value, so either version works. The Cobaya input files in `hdinitpk/cobaya_yaml_files` use `lens_margin`, so you must edit them and rename this parameter if you are using CAMB version 2.0.0 or later.
 - [hdfisher](https://github.com/CMB-HD/hdfisher)
-- [hdMockData](https://github.com/CMB-HD/hdMockData), version `v1.2` or later. The CMB-HD bandpowers, covariance matrices, and lensing reconstruction noise used here were added in v1.2.
+- [hdMockData](https://github.com/CMB-HD/hdMockData), version `v1.2` or later. The CMB-HD theory spectra and bandpowers from CAMB and CLASS, the covariance matrices, the lensing reconstruction noise, and the CAMB and CLASS settings used here were added in v1.2.
 - [hdPk](https://github.com/CMB-HD/hdPk), which provides `cmb_from_pk`, used for the binned primordial power spectrum calculation
-- [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper `classy`, only needed to recompute the CLASS Fisher forecasts or to run the CLASS CMB-HD chains
+- [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper `classy`, only needed to recompute the CLASS Fisher forecasts or to run the CLASS CMB-HD chains.
+  - **CLASS must to be modified** before it is built, as described here and in Appendix A of Cheslog et. al. (2026), when using the defaults set throughout `hdInitPk`. The line numbers below are for CLASS v3.3.4 (the version used in that work), and `$CLASS_DIR` refers to the path to the CLASS repository directory (named `class_public` by default):
+    - In `$CLASS_DIR/source/lensing.c`, line 124: declare both `num_mu` and `index_mu` as `long long`, and `icount` as `unsigned long long` (in version 3.3.4, all are originally `int`). Without this CLASS overflows at the multipoles used here and tries to allocate an array of negative size. In CLASS v3.4.0 the declarations are on lines 130 and 131, and `icount` is already `long long`.
+    - In `$CLASS_DIR/source/input.c`, line 2470 (line 2548 in v3.4.0): comment out the `class_test` that stops CLASS when `Omega0_ur` is negative. The down step in `N_ur` takes it below zero; see [Running new Fisher forecasts](#running-new-fisher-forecasts).
+    - You must place a copy of the `sBBN file`, provided [here](https://github.com/CMB-HD/hdMockData/blob/main/hd_mock_data/data/theory/PRIMAT_Yp_DH_ErrorMC_2021_CLASS.dat), in the `$CLASS_DIR/external/bbn/` directory. This is the file used in Cheslog et. al. (2026), and it is the default in `hdInitPk`.
 - [pandas](https://pandas.pydata.org/), [matplotlib](https://matplotlib.org/), and [getdist](https://getdist.readthedocs.io/en/latest/intro.html), only needed for the Jupyter notebooks
 - [Cobaya](https://cobaya.readthedocs.io/en/latest/), only needed to run new MCMC chains
 - [hdlike](https://github.com/CMB-HD/hdlike), only needed to run new CMB-HD MCMC chains
-- the external CMB and BAO likelihoods, only needed to run new current-data MCMC chains. They are listed with links under [External likelihoods](#external-likelihoods) below.
+- the external CMB and BAO likelihoods, only needed to run new current-data MCMC chains. They are listed with links under [External likelihoods used](#external-likelihoods-used) below.
 - [mpi4py](https://mpi4py.readthedocs.io/en/stable/), optional. The Fisher derivative calculation can be spread over several processes with it, but it is not required.
 
 ## Installing
@@ -36,7 +58,7 @@ pip install . --user
 
 # What is in this repository
 
-Everything in the paper can be reproduced from what is here. The three tables below list the complete contents of the repository, and the sections that follow explain them in more detail.
+Everything in Cheslog et al. (2026) can be reproduced from what is here. The three tables below list the complete contents of the repository, and the sections that follow explain them in more detail.
 
 ## Notebooks
 
@@ -60,13 +82,13 @@ Everything in the paper can be reproduced from what is here. The three tables be
 
 | Directory | Contents |
 |---|---|
-| `hdinitpk/data/` | the thinned MCMC chains, the twenty Fisher matrices, the Figure 6 points, the binning files, the cached binned-$\mathcal{P}(k)$ statistics, the MCMC proposal matrices, and the fiducial-parameter and step-size files of Tables I and II |
+| `hdinitpk/data/` | the thinned MCMC chains, the twenty Fisher matrices, the Figure 6 points, the binning files, the cached binned-$\mathcal{P}(k)$ statistics, the MCMC proposal matrices, and the fiducial-parameter and step-size files of Tables I and II. The CMB-HD mock data itself comes from hdMockData |
 | `hdinitpk/data/user_generated_data/` | empty at first. Everything you generate with the scripts and notebooks (Fisher derivatives and matrices, MCMC chains, and statistics computed from them) is written here and read back from here |
-| `hdinitpk/cobaya_yaml_files/` | Cobaya input files for every MCMC in the paper. Five power-law runs on current data, seven binned-$\mathcal{P}(k)$ runs on current data, and four CMB-HD mock runs |
+| `hdinitpk/cobaya_yaml_files/` | Cobaya input files for every MCMC in Cheslog et al. (2026). Five power-law runs on current data, seven binned-$\mathcal{P}(k)$ runs on current data, and four CMB-HD mock runs |
 
 Table VI is a table of CAMB and CLASS computation times and is not reproduced by any of the above. Tables I and II are inputs rather than results. They give the $k$ bin centers and priors, and the fiducial parameters, step sizes and priors, which ship in `hdinitpk/data/fisher_fid_params` and `hdinitpk/data/fisher_steps`.
 
-# Reproducing the figures and tables
+# Reproducing the figures and tables of Cheslog et al. (2026)
 
 ## The plotting notebook
 
@@ -75,7 +97,7 @@ Table VI is a table of CAMB and CLASS computation times and is not reproduced by
 - Part 1, current results, reproduces Figure 1 and Table III from the thinned MCMC chains, along with the marginalized binned-$\mathcal{P}(k)$ statistics used in Part 2.
 - Part 2, forecasted results, reproduces Figures 2 through 11 (all but Figure 8) and Tables IV, V, VII and VIII, from the saved Fisher matrices, the saved Figure 6 points, and the chains loaded in Part 1.
 
-It reads the chains, the Fisher matrices, the Figure 6 points and the binning files from `hdinitpk/data`. Each saved Fisher matrix already includes the $\tau$ prior and, where applicable, the $\log_{10}(T_\mathrm{AGN})$ prior and the DESI BAO Fisher, exactly as applied in the paper, so the error tables follow from a matrix inversion.
+It reads the chains, the Fisher matrices, the Figure 6 points and the binning files from `hdinitpk/data`. Each saved Fisher matrix already includes the $\tau$ prior and, where applicable, the $\log_{10}(T_\mathrm{AGN})$ prior and the DESI BAO Fisher, exactly as applied in Cheslog et al. (2026), so the error tables follow from a matrix inversion.
 
 By default the notebook uses the thinned chains distributed with the package. To use results you have run yourself with `run_hdInitPk_current.ipynb`, set
 
@@ -89,9 +111,9 @@ near the top. The notebook then reads the results from `hdinitpk/data/user_gener
 
 ## Rebuilding the Fisher forecasts
 
-Unless stated otherwise, the Fisher forecasts in the paper are calculated with CLASS. That includes Table IV and Figures 2 and 4. CAMB is used for the $w_0 w_a$CDM forecasts, where we found the two codes disagree, for the baryonic feedback forecast of Table V, and for the binned-$\mathcal{P}(k)$ forecasts, which go through hdPk and are CAMB only. A CAMB nine-parameter forecast is also kept for the comparison between the two codes in Appendix B.
+Unless stated otherwise, the Fisher forecasts in Cheslog et al. (2026) are calculated with CLASS. That includes Table IV and Figures 2 and 4. CAMB is used for the $w_0 w_a$CDM forecasts, where we found the two codes disagree, for the baryonic feedback forecast of Table V, and for the binned-$\mathcal{P}(k)$ forecasts, which go through hdPk and are CAMB only. A CAMB nine-parameter forecast is also kept for the comparison between the two codes in Appendix B. The CLASS forecasts need CLASS modified as described under [Requirements](#requirements); an unmodified CLASS fails partway through the derivatives.
 
-`run_hdInitPk_forecasts.ipynb` rebuilds every Fisher forecast from scratch. It computes the numerical derivatives of the CMB and BAO theory, assembles the twenty Fisher matrices from them, reports the forecasted parameter errors, and compares them parameter by parameter against the matrices in `hdinitpk/data/fisher_matrices`. It follows the `example_calculate_fisher_matrices.ipynb` notebook of [hdfisher](https://github.com/CMB-HD/hdfisher), extended to the nine configurations this paper uses. These cover CAMB and CLASS, CMB-HD and SO-like, power-law and binned $\mathcal{P}(k)$, with and without baryonic feedback and a kSZ template.
+`run_hdInitPk_forecasts.ipynb` rebuilds every Fisher forecast from scratch. It computes the numerical derivatives of the CMB and BAO theory, assembles the twenty Fisher matrices from them, reports the forecasted parameter errors, and compares them parameter by parameter against the matrices in `hdinitpk/data/fisher_matrices`. It follows the `example_calculate_fisher_matrices.ipynb` notebook of [hdfisher](https://github.com/CMB-HD/hdfisher), extended to the nine configurations Cheslog et al. (2026) uses. These cover CAMB and CLASS, CMB-HD and SO-like, power-law and binned $\mathcal{P}(k)$, with and without baryonic feedback and a kSZ template.
 
 The notebook shows how to run the derivatives in place, which works but takes hours per configuration. `run_hdInitPk_forecasts.py` runs the same nine configurations as a batch job.
 
@@ -105,7 +127,7 @@ Set `CALCULATE_DERIVS = True` at the top of that file. Either way the derivative
 
 `run_hdInitPk_current.ipynb` walks through the twelve Cobaya runs behind the current-data constraints. It shows what each input file contains, which external likelihoods you need, how to fill in the `/path/to/...` placeholders, the exact command for each run, and how to turn the finished chains into Table III and the marginalized binned-$\mathcal{P}(k)$ statistics of Table VIII. The chains and cached results go to `hdinitpk/data/user_generated_data`, in the layout the plotting notebook reads.
 
-## Figure 6 and Figure 8
+## Reproducing Figure 6 and Figure 8 of Cheslog et al. (2026)
 
 Two results come from scripts rather than the plotting notebook.
 
@@ -122,11 +144,11 @@ The script reads the `camb_9param` and `class_9param` derivatives from `hdinitpk
 
 $$b_i = (F^{-1})_{ij} \ \partial_j C^T \ \mathrm{Cov}^{-1} \ (C^\mathrm{true} - C^\mathrm{fid})$$
 
-at each accuracy setting, divides it by the forecasted error on each parameter, prints the result, and draws Figure 8. Everything else it needs (the accuracy-grid spectra, the high-accuracy reference spectra, and the eight-parameter Fisher matrices) ships with the package. Figure 7, which compares the CAMB and CLASS spectra at the settings adopted for the paper, stays in the plotting notebook and needs nothing external.
+at each accuracy setting, divides it by the forecasted error on each parameter, prints the result, and draws Figure 8. Everything else it needs (the accuracy-grid spectra, the high-accuracy reference spectra, and the eight-parameter Fisher matrices) ships with the package. Setting `RECALCULATE_SPECTRA = True` at the top of the script calculates the grid spectra and the reference again, with the settings of Appendix A, instead of reading the shipped ones. That is slow, since the reference alone takes hours, so run it under MPI. Figure 7, which compares the CAMB and CLASS spectra at the settings adopted for Cheslog et al. (2026), stays in the plotting notebook and needs nothing external.
 
 # Running MCMC chains on current data
 
-The Cobaya input files used for the MCMC chains in the paper are in `hdinitpk/cobaya_yaml_files`.
+The Cobaya input files used for the MCMC chains in Cheslog et al. (2026) are in `hdinitpk/cobaya_yaml_files`.
 
 `current_data/` holds the power-law chains on CMB-PAS + DESI DR2, one per set of free parameters, for Figure 1 and Table III, plus the P-ACT-LB comparison chain.
 
@@ -138,7 +160,7 @@ The Cobaya input files used for the MCMC chains in the paper are in `hdinitpk/co
 | `lcdm_nrun_nnu_mnu.yaml` | $\Lambda$CDM + $\alpha_\mathrm{s}$ + $N_\mathrm{eff}$ + $\sum m_\nu$ | CMB-PAS + DESI DR2 | `chains/pas/pas_lcdm_nrun_nnu_mnu` |
 | `p_act_lb.yaml` | $\Lambda$CDM + $\alpha_\mathrm{s}$ | P-ACT-LB | `chains/P-ACT-LB/pact_lb_nrun` |
 
-`binned_pk/` holds the binned primordial $\mathcal{P}(k)$ chains run on current data, for Figure 3 and Table VIII (seven bins) and Figures 10 and 11 (30 bins), with and without DESI BAO, and for both the CMB-PAS and P-ACT-LB data combinations. They use the `BinnedPk` theory class in `arbitrary_Pkbinning.py` with the bins set to the paper's seven- and 30-bin schemes.
+`binned_pk/` holds the binned primordial $\mathcal{P}(k)$ chains run on current data, for Figure 3 and Table VIII (seven bins) and Figures 10 and 11 (30 bins), with and without DESI BAO, and for both the CMB-PAS and P-ACT-LB data combinations. They use the `BinnedPk` theory class in `arbitrary_Pkbinning.py` with the bins set to the seven- and 30-bin schemes of Cheslog et al. (2026).
 
 | File | Data | Bins |
 |---|---|---|
@@ -154,7 +176,7 @@ The Cobaya input files used for the MCMC chains in the paper are in `hdinitpk/co
 
 Some of the paths in these files, written as `/path/to/...`, are placeholders. They stand for the external likelihood data (the *Planck* `clik` files, the SPT-3G D1 candl data set, and so on), the directory the chains are written to, and the directory this repository was cloned into. They need to be filled in before the files can be run. Each file has a header listing the placeholders it uses, and `run_hdInitPk_current.ipynb` fills them in for you.
 
-Every chain in the paper was run as six chains, one per MPI process, on the SeaWulf computing system at Stony Brook University. The command for one run is
+Every chain in Cheslog et al. (2026) was run as six chains, one per MPI process, on the SeaWulf computing system at Stony Brook University. The command for one run is
 
 ```
 mpirun -np 6 cobaya-run mcmc_runs/cmb_pas_desi_7_bins_arbitrary_binning.yaml
@@ -164,7 +186,7 @@ where `mcmc_runs/` is the directory of prepared copies that `run_hdInitPk_curren
 
 Each file's `sampler.mcmc.covmat` points at a proposal covariance in `hdinitpk/data/proposal_matrices/`, built from that run's own converged chain. These ship with the package.
 
-## External likelihoods
+## External likelihoods used
 
 These are not dependencies of `hdinitpk` itself. Install only the ones the runs you want require. The *Planck* low-$\ell$ and DESI BAO likelihoods are built into Cobaya and need no separate installation, though Cobaya must download their data (`cobaya-install`).
 
@@ -178,12 +200,12 @@ These are not dependencies of `hdinitpk` itself. Install only the ones the runs 
 | `planck_2018_lowl.TT`, `planck_2018_lowl.EE_sroll2` | *Planck* 2018 low-$\ell$ TT and the `sroll2` low-$\ell$ EE reanalysis | built into Cobaya ([likelihood docs](https://cobaya.readthedocs.io/en/latest/likelihood_planck.html)) |
 | `bao.desi_dr2.desi_bao_all`, `bao.desi_2024_bao_all` | DESI DR2 and DESI 2024 (DR1) BAO | built into Cobaya ([likelihood docs](https://cobaya.readthedocs.io/en/latest/likelihood_bao.html)) |
 | `hdlike.hdlike.HDLike` | the CMB-HD mock likelihood, used only by the `HD/` files | [CMB-HD/hdlike](https://github.com/CMB-HD/hdlike) |
-| `bao.generic` | the CMB-HD mock DESI BAO data, used only by the `HD/` files | ships with [CMB-HD/hdlike](https://github.com/CMB-HD/hdlike) |
+| `bao.generic` | the CMB-HD mock DESI BAO data, used only by the `HD/` files | the data we use ships with [CMB-HD/hdlike](https://github.com/CMB-HD/hdlike) |
 
 Two theory-side requirements are worth calling out.
 
 - Every current-data file sets `recombination_model: CosmoRec`. CAMB must be built against [CosmoRec](https://www.jb.man.ac.uk/~jchluba/Science/CosmoRec/CosmoRec.html), which is not the default. See CAMB's [recombination models](https://camb.readthedocs.io/en/latest/recombination.html) documentation.
-- `HD/class_*_likelihood.yaml` use `classy` rather than `camb`, so they need [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper. The sBBN table those files point at, `PRIMAT21_class_format.dat`, is included here in `hdinitpk/data/class_inputs/`.
+- `HD/class_*_likelihood.yaml` use `classy` rather than `camb`, so they need [CLASS](https://github.com/lesgourg/class_public) and its Python wrapper, modified as described under [Requirements](#requirements) (Appendix A of Cheslog et al. 2026). They use the BBN table that ships with hdMockData, at the path hdMockData gives, so it must be copied to the `external/bbn` directory of CLASS as described under [Requirements](#requirements). hdlike sees that CLASS is used and compares the theory to the CMB-HD bandpowers calculated with CLASS, which also come from hdMockData.
 
 # Running a binned primordial P(k) with arbitrary binning
 
@@ -205,7 +227,7 @@ $$b_i = e^{-2\tau} \ \mathcal{P}_i(k) \ / \ \texttt{scale}$$
 
 since `BinnedPk` multiplies the amplitudes by `scale` and by $e^{2\tau}$ before passing them to CAMB. With the default `scale`, $b_i = 10^9 \ e^{-2\tau} \mathcal{P}_i(k)$. Sampling in $e^{-2\tau}\mathcal{P}(k)$ rather than $\mathcal{P}(k)$ minimizes the degeneracy between the optical depth and the overall amplitude.
 
-The files in `hdinitpk/cobaya_yaml_files/binned_pk` are working examples, one for each binned chain in the paper, using this class with its bins set to the paper's own seven- and 30-bin schemes. Point `python_path` at your clone of this repository so Cobaya can import the module.
+The files in `hdinitpk/cobaya_yaml_files/binned_pk` are working examples, one for each binned chain in Cheslog et al. (2026), using this class with its bins set to the same seven- and 30-bin schemes. Point `python_path` at your clone of this repository so Cobaya can import the module.
 
 ```yaml
 theory:
@@ -238,7 +260,7 @@ with one CAMB call per cosmology returning the $z = 0$ matter transfer function 
 
 Both modes use the same transfer-function method, but each keeps the CAMB accuracy settings of the calculation it came from.
 
-Chain mode takes a `CHAIN_SOURCE` at the top of the file. `'packaged'` (the default) reads the thinned chain distributed with the package, so the script runs out of the box. `'custom'` reads a chain you have run yourself with `run_hdInitPk_current.ipynb`, from `hdinitpk/data/user_generated_data/chains`. `'raw'` reads your own full Cobaya output from `RAW_CHAIN_ROOT`. The results in the paper were obtained from the full chains, so `'raw'` or `'custom'` is what reproduces them. The burn-in follows the source automatically. The packaged chain had its burn-in removed before thinning, so nothing more is removed there, and the first half of each chain is dropped for the other two.
+Chain mode takes a `CHAIN_SOURCE` at the top of the file. `'packaged'` (the default) reads the thinned chain distributed with the package, so the script runs out of the box. `'custom'` reads a chain you have run yourself with `run_hdInitPk_current.ipynb`, from `hdinitpk/data/user_generated_data/chains`. `'raw'` reads your own full Cobaya output from `RAW_CHAIN_ROOT`. The results in Cheslog et al. (2026) were obtained from the full chains, so `'raw'` or `'custom'` is what reproduces them. The burn-in follows the source automatically. The packaged chain had its burn-in removed before thinning, so nothing more is removed there, and the first half of each chain is dropped for the other two.
 
 The run is parallelized with `hdfisher.mpi`.
 
@@ -250,9 +272,9 @@ Fisher mode splits each experiment's samples across all ranks. Chain mode distri
 
 # Running new Fisher forecasts
 
-`run_hdInitPk_forecasts.ipynb` already does all of this for the nine configurations in the paper, and `run_hdInitPk_forecasts.py` does the same as a batch job. This section is for forecasting something the paper does not cover.
+`run_hdInitPk_forecasts.ipynb` already does all of this for the nine configurations in Cheslog et al. (2026), and `run_hdInitPk_forecasts.py` does the same as a batch job. This section is for forecasting something Cheslog et al. (2026) does not cover.
 
-`hdinitpk.hdinitPkfisher.Fisher` extends [hdfisher](https://github.com/CMB-HD/hdfisher)'s `Fisher` with a binned primordial power spectrum and a kSZ template, and takes the same arguments plus `binned_pk`, `bin_edges`, `ksz`, and `pk_frac_step`. Code written with `hdfisher` only needs to change its import.
+`hdinitpk.hdinitPkfisher.Fisher` extends [hdfisher](https://github.com/CMB-HD/hdfisher)'s `Fisher` with a binned primordial power spectrum and a kSZ template, and takes the same arguments plus `binned_pk`, `bin_edges`, `ksz`, and `pk_frac_step`, with one difference: the Boltzmann code is chosen by name, `use_class_or_camb='camb'` or `'class'` (either case), in place of hdfisher's `use_class` flag. Code written with `hdfisher` only needs to change its import and that one argument. The theory is calculated to the maximum multipole of the CMB-HD mock data in hdMockData (24,000 for v1.2) for every experiment, as in Cheslog et al. (2026); pass `theo_lmax=None` to use the value hdfisher sets for the experiment instead (5,000 for the SO-like configuration), or a number. The covariance matrices, the lensing reconstruction noise, the binning, and the BBN table that CLASS reads all come from hdMockData. The fiducial-parameter files in `hdinitpk/data/fisher_fid_params` hold the cosmology and the parameters that are varied; their accuracy settings are the ones in hdMockData.
 
 `example_calc_binnedPk_forecasts.py` is a template for calculating the Fisher derivatives, and shows how to assemble a Fisher matrix from them afterwards.
 
@@ -265,10 +287,12 @@ fisherlib = hdinitPkfisher.Fisher(
 fisherlib.calculate_fisher_derivs()
 ```
 
-When `binned_pk=True`, the parameter file must give the number of bins (`nkbins`), the bin centers (`k1`, `k2`, and so on), the bin amplitudes (`Pk1`, `Pk2`, ... or `eneg2tauPk1`, ...), and an `effective_ns_for_nonlinear` entry. The step-size file must give a step for each bin amplitude, and `bin_edges` is required. Fiducial-parameter and step-size files for the paper's binnings are in `hdinitpk/data/fisher_fid_params` and `hdinitpk/data/fisher_steps`.
+When `binned_pk=True`, the parameter file must give the number of bins (`nkbins`), the bin centers (`k1`, `k2`, and so on), the bin amplitudes (`Pk1`, `Pk2`, ... or `eneg2tauPk1`, ...), and an `effective_ns_for_nonlinear` entry. The step-size file must give a step for each bin amplitude, and `bin_edges` is required. Fiducial-parameter and step-size files for the binnings of Cheslog et al. (2026) are in `hdinitpk/data/fisher_fid_params` and `hdinitpk/data/fisher_steps`.
 
 Because the derivatives are computed by perturbing the spectra inside one $k$ bin at a time, `pk_frac_step` must match the step size given for the `Pk` parameters in the step-size file. The spectra are perturbed by `pk_frac_step`, while the finite-difference denominator comes from that file. The example pairs them correctly. Rerunning it with the 1% and 10% step-size files, and the matching `pk_frac_step`, is how the derivatives were checked for convergence.
 
-The derivatives are large. The example writes them to `hdinitpk/data/user_generated_data/fisher_derivs`, and the environment variable `HDINITPK_USER_DATA` moves that directory somewhere else.
+The derivatives are large. The example writes them to `hdinitpk/data/user_generated_data/fisher_derivs`.
 
-The binned-$\mathcal{P}(k)$ calculation uses CAMB (via `hdPk`) and cannot be combined with `use_class=True`. Any additional parameter accepted by CAMB's [`set_params`](https://camb.readthedocs.io/en/latest/camb.html#camb.set_params) may be varied.
+The binned-$\mathcal{P}(k)$ calculation uses CAMB (via `hdPk`) and cannot be combined with `use_class_or_camb='class'`. Any additional parameter accepted by CAMB's [`set_params`](https://camb.readthedocs.io/en/latest/camb.html#camb.set_params) may be varied.
+
+The CLASS parameter files name the parameters the way CLASS does. Two of them differ from CAMB in more than name. The total neutrino mass is varied as `sum_m_ncdm`, an hdfisher alias that it reads off the `m_ncdm` entry and splits evenly over the massive species again after each step, so the same 10% relative step as CAMB's `mnu` applies. $N_\mathrm{eff}$ is varied as `N_ur`, the number of massless neutrinos, with an absolute step of 0.1522: with the three massive species fixed, that is the same change in $N_\mathrm{eff}$ as the 5% relative step used with CAMB, and the derivative is the same. Note that the down step takes `N_ur` negative (0.00441 - 0.1522 = -0.1478), which an unmodified CLASS refuses. That is what the `input.c` modification under [Requirements](#requirements) is for.

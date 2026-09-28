@@ -1,6 +1,7 @@
 # cosmological parameters from Planck 2018 TT,TE,EE + low l + low E + lensing
 ombh2: 0.02237
 omch2: 0.1200
+theta: 1.04071
 tau: 0.0544
 H0: 67.36
 nnu: 3.044
@@ -24,8 +25,9 @@ DoLateRadTruncation: False
 lens_margin: 2050
 lens_potential_accuracy: 30
 bbn_predictor: 'PRIMAT_Yp_DH_ErrorMC_2021.dat'
-recombination_model: 'Recfast' 
-lmax: 24000
+recombination_model: 'Recfast'
+# The maximum multipole is not set here. The theory is calculated to the
+# lmax of the CMB-HD mock data in hdMockData (24,000 for v1.2).
 
 # ks:
 k1: 6.086768361185573850e-03

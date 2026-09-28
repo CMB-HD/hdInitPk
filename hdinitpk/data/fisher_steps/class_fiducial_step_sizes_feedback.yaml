@@ -1,0 +1,49 @@
+omega_b:
+        step_size: 0.01
+        step_type: relative
+
+omega_cdm:
+        step_size: 0.01
+        step_type: relative
+
+tau_reio:
+        step_size: 0.05
+        step_type: relative
+
+ln_A_s_1e10:
+        # a step of ~0.3% in ln(A_s * 1e10) corresponds to 1% in A_s
+        step_size: 0.0033
+        step_type: relative
+
+n_s:
+        step_size: 0.01
+        step_type: relative
+
+# `sum_m_ncdm` is the TOTAL neutrino mass, the same quantity as CAMB's `mnu`,
+# so this is the identical 10% relative step the CAMB file uses. No rescaling
+# is needed when comparing the two Fisher matrices.
+sum_m_ncdm:
+        step_size: 0.10
+        step_type: relative
+
+H0:
+        step_size: 0.01
+        step_type: relative
+
+alpha_s:
+        step_size: 0.01
+        step_type: absolute
+
+# CLASS takes the number of massless neutrinos `N_ur`, not N_eff. With three
+# massive species fixed, a change in N_ur is the same change in N_eff, so the
+# 5% relative step in N_eff used with CAMB (0.05 * 3.044 = 0.1522) becomes an
+# absolute step of 0.1522 in N_ur, and the derivative is the same. The step
+# down takes N_ur below zero, which CLASS only allows after the change to its
+# source code described in Appendix A of Cheslog et. al. (2026).
+N_ur:
+        step_size: 0.1522
+        step_type: absolute
+
+log10T_heat_hmcode:
+        step_size: 0.05
+        step_type: absolute

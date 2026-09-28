@@ -29,8 +29,9 @@ those configurations back.
 The step-size and fiducial-parameter files come from the installed hdinitpk
 package, so this runs anywhere the package is importable. The output goes
 to hdinitpk/data/user_generated_data, where the notebooks and the other
-scripts look for it. The CMB-HD mock data (the lensing reconstruction noise
-and the covariance matrices) comes from hdMockData.
+scripts look for it. The CMB-HD mock data (the lensing reconstruction noise,
+the covariance matrices, the binning, and the BBN table CLASS reads) comes
+from hdMockData.
 
 `run_hdInitPk_forecasts.ipynb` walks through the same calculation
 interactively, one configuration at a time.
@@ -39,46 +40,26 @@ import os
 
 from hdfisher import fisher as hdfisher_fisher
 from hdfisher import mpi
-from hdinitpk import hdinitPkfisher as hdinitpk_fisher
+from hdinitpk import hdinitPkfisher
 import hdinitpk
 
 
 # ----------------------------------------------------------------------
 # Paths
 # ----------------------------------------------------------------------
-STEPS_DIR = hdinitpk.data_path('fisher_steps')
-PARAMS_DIR = hdinitpk.data_path('fisher_fid_params')
 REFERENCE_MATRIX_DIR = hdinitpk.data_path('fisher_matrices')
 
-# Set HDINITPK_USER_DATA to put the output somewhere else.
+# Where the output goes.
 DERIV_DIR = hdinitpk.user_data_path('fisher_derivs')
 MATRIX_OUT_DIR = hdinitpk.user_data_path('fisher_matrices')
 
-# The CLASS parameter files name the sBBN table, and CLASS opens that file
-# itself, so the `/path/to/hdInitPk` placeholder in the shipped copies has
-# to be replaced with a real path. `params` writes the resolved copy here.
-RESOLVED_PARAMS_DIR = hdinitpk.user_data_path('resolved_params')
-PLACEHOLDER = '/path/to/hdInitPk/hdinitpk/data'
-
 
 def steps(name):
-    return os.path.join(STEPS_DIR, name)
+    return hdinitpk.data_path('fisher_steps', name)
 
 
 def params(name):
-    """A fiducial-parameter file from the package, with the sBBN path
-    filled in if the file has one. Only rank 0 writes the copy."""
-    src = os.path.join(PARAMS_DIR, name)
-    with open(src, encoding='utf-8') as f:
-        text = f.read()
-    if PLACEHOLDER not in text:
-        return src
-    out = os.path.join(RESOLVED_PARAMS_DIR, name)
-    if mpi.rank == 0:
-        with open(out, 'w', encoding='utf-8') as f:
-            f.write(text.replace(PLACEHOLDER, hdinitpk.DATA_DIR))
-    mpi.comm.barrier()
-    return out
+    return hdinitpk.data_path('fisher_fid_params', name)
 
 
 # ----------------------------------------------------------------------
@@ -102,19 +83,23 @@ ONLY_JOBS = None
 use_H0 = True   # marginalize over H0 rather than theta
 
 # The CMB-HD mock data version, passed to every job rather than left at
-# hdfisher's default of 'latest'. v1.2 is what the paper used.
+# hdfisher's default of 'latest'. v1.2 is what the paper used. It sets the
+# noise curves, the covariance matrices, and the maximum multipole the
+# theory is calculated to (24,000), for CMB-HD and SO alike.
 hd_data_version = 'v1.2'
 
 TAU_PRIOR = {'tau': 0.005}
 FEEDBACK_PRIOR = {'tau': 0.005, 'HMCode_logT_AGN': 0.0006 * 7.8}
 
-# k bin edges [Mpc^-1] for the 11-bin binned-P(k) scheme.
-PK_BIN_EDGES = [3.667637511098258835e-03, 8.505899211272888866e-03,
-                1.972668268698882926e-02, 4.574966151931515734e-02,
-                1.061015459285717805e-01, 2.460682259622835044e-01,
-                5.706756795889451617e-01, 1.323497700691443235e+00,
-                3.069424940269466440e+00, 7.118538595893407539e+00,
-                1.650914836730800417e+01, 3.828763111167506139e+01]
+# The k bin edges [Mpc^-1] of the 11-bin binned-P(k) scheme, from the
+# binning file (Table I).
+_k_bins = hdinitpk.data_path('binning', 'hd_pk_wavenumbers_11bins.txt')
+_lower, _upper = __import__('numpy').loadtxt(_k_bins, usecols=(1, 2), unpack=True)
+PK_BIN_EDGES = list(_lower) + [_upper[-1]]
+
+# The fraction by which the power inside a k bin is changed when its
+# amplitude is varied. Matches the 5% steps in the binned-P(k) step files.
+PK_FRAC_STEP = 0.05
 
 
 # ----------------------------------------------------------------------
@@ -141,11 +126,12 @@ ext_model_params = {
 
 # The CLASS parameter files use CLASS names, so parameter lists and priors
 # are translated on the way in. The matrices are saved with CLASS names,
-# and the plotting notebook translates them back.
+# and the plotting notebook translates them back. N_eff is varied through
+# `N_ur`, the number of massless neutrinos, which CLASS takes directly.
 camb_to_class = {
     'ombh2': 'omega_b',   'omch2': 'omega_cdm',  'theta': 'theta_s_100',
     'tau': 'tau_reio',    'logA': 'ln_A_s_1e10', 'As': 'A_s',
-    'ns': 'n_s',          'H0': 'H0',            'nnu': 'Neff',
+    'ns': 'n_s',          'H0': 'H0',            'nnu': 'N_ur',
     'mnu': 'sum_m_ncdm',  'nrun': 'alpha_s',     'omk': 'Omega_k',
     'w': 'w0_fld',        'wa': 'wa_fld',
     'HMCode_logT_AGN': 'log10T_heat_hmcode',
@@ -162,15 +148,17 @@ def to_class(params_):
 # ----------------------------------------------------------------------
 # The nine configurations
 # ----------------------------------------------------------------------
-# Jobs with binned_pk or ksz need hdinitpk's Fisher, which subclasses
-# hdfisher's. The rest use hdfisher's directly.
+# Every configuration is an `hdinitpk.hdinitPkfisher.Fisher`, which
+# extends hdfisher's `Fisher` with the binned P(k) and the kSZ template.
+# The theory is calculated to the CMB-HD lmax (24,000) for SO as well,
+# as in the paper (`theo_lmax='hd'`, the default). The `kwargs` are what
+# it is constructed with, on top of `hd_data_version`.
 JOBS = {
     # CMB-HD, CLASS. Behind Table IV and Figures 2 and 4.
     'class': {
         'dirname': 'class_9param',
-        'cls': hdfisher_fisher.Fisher,
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=True,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='class',
             fisher_steps_file=steps('class_fiducial_step_sizes.yaml'),
             param_file=params('class_fiducial_params.yaml')),
     },
@@ -179,9 +167,8 @@ JOBS = {
     # extended models of Table IV.
     'so': {
         'dirname': 'so_9param',
-        'cls': hdfisher_fisher.Fisher,
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=True, exp='so',
+            overwrite=True, use_H0=use_H0, use_class_or_camb='class', exp='so',
             fisher_steps_file=steps('class_fiducial_step_sizes.yaml'),
             param_file=params('class_fiducial_params.yaml')),
     },
@@ -190,9 +177,8 @@ JOBS = {
     # accuracy study (Appendix A).
     'camb': {
         'dirname': 'camb_9param',
-        'cls': hdfisher_fisher.Fisher,
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb',
             fisher_steps_file=steps('camb_fiducial_step_sizes.yaml'),
             param_file=params('camb_fiducial_params.yaml')),
     },
@@ -201,33 +187,26 @@ JOBS = {
     # Table V, with delensed spectra.
     'camb_feedback_ksz': {
         'dirname': 'camb_feedback_ksz',
-        'cls': hdinitpk_fisher.Fisher,
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False,
-            binned_pk=False, ksz=True,
-            fisher_steps_file=steps('fiducial_step_sizes_feedback_ksz.yaml'),
-            param_file=params('fiducial_params_feedback_ksz.yaml')),
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb', ksz=True,
+            fisher_steps_file=steps('camb_fiducial_step_sizes_feedback_ksz.yaml'),
+            param_file=params('camb_fiducial_params_feedback.yaml')),
     },
 
     # w0waCDM + alpha_s, with CAMB. Both need the w0wa step-size file,
-    # since hdfisher's default steps do not vary w and wa. The parameter
-    # file's lmax of 24000 takes precedence over the experiment's, so the
-    # SO theory is computed to 24000 and then binned into SO's ell ranges,
-    # as it was for the published forecasts.
+    # since the default steps do not vary w and wa.
     'w0wa_hd': {
         'dirname': 'hd_w0wa',
-        'cls': hdfisher_fisher.Fisher,
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb',
             fisher_steps_file=steps('camb_w0wa_fiducial_step_sizes.yaml'),
             param_file=params('camb_w0wa_fiducial_params.yaml')),
     },
 
     'w0wa_so': {
         'dirname': 'so_w0wa',
-        'cls': hdfisher_fisher.Fisher,
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False, exp='so',
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb', exp='so',
             fisher_steps_file=steps('camb_w0wa_fiducial_step_sizes.yaml'),
             param_file=params('camb_w0wa_fiducial_params.yaml')),
     },
@@ -235,30 +214,28 @@ JOBS = {
     # Binned P(k), with CAMB through hdPk.
     'binned_pk_hd': {
         'dirname': 'hd_binned_pk',
-        'cls': hdinitpk_fisher.Fisher,
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False,
-            binned_pk=True, ksz=False, bin_edges=PK_BIN_EDGES,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb',
+            binned_pk=True, bin_edges=PK_BIN_EDGES, pk_frac_step=PK_FRAC_STEP,
             fisher_steps_file=steps('binned_pk_steps_5_percent.yaml'),
             param_file=params('hd_binned_pk_fiducial_params.yaml')),
     },
 
     'binned_pk_so': {
         'dirname': 'so_binned_pk',
-        'cls': hdinitpk_fisher.Fisher,
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False, exp='so',
-            binned_pk=True, ksz=False, bin_edges=PK_BIN_EDGES,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb', exp='so',
+            binned_pk=True, bin_edges=PK_BIN_EDGES, pk_frac_step=PK_FRAC_STEP,
             fisher_steps_file=steps('binned_pk_steps_5_percent.yaml'),
             param_file=params('hd_binned_pk_fiducial_params.yaml')),
     },
 
     'binned_pk_hd_feedback': {
         'dirname': 'hd_binned_pk_feedback',
-        'cls': hdinitpk_fisher.Fisher,
         'kwargs': dict(
-            overwrite=True, use_H0=use_H0, use_class=False,
+            overwrite=True, use_H0=use_H0, use_class_or_camb='camb',
             binned_pk=True, ksz=True, bin_edges=PK_BIN_EDGES,
+            pk_frac_step=PK_FRAC_STEP,
             fisher_steps_file=steps('binned_pk_steps_5_percent_feedback.yaml'),
             param_file=params('hd_binned_pk_fiducial_params_feedback.yaml')),
     },
@@ -276,8 +253,7 @@ JOBS = {
 # Four of the six SO matrices come from the CLASS `so` job, so their
 # parameter lists and priors go through `to_class` and the saved matrices
 # carry CLASS names. `so_w0wa_lensed` and the binned P(k) forecast stay on
-# CAMB. All the SO matrices use lensed spectra, which come from hdfisher's
-# own `data/covmats` directory, since hdMockData carries CMB-HD data only.
+# CAMB. All the SO matrices use lensed spectra.
 MATRICES = [
     ('hd_class_lensed_9param', 'class', {},
      dict(cmb_type='lensed', priors=to_class(TAU_PRIOR), with_desi=True,
@@ -358,11 +334,10 @@ def job_dir(name):
 
 def run_job(name):
     """Build one Fisher library and calculate its derivatives."""
-    job = JOBS[name]
     if mpi.rank == 0:
         print(f'\n=== {name} -> {job_dir(name)}', flush=True)
-    kwargs = dict(job['kwargs'], hd_data_version=hd_data_version)
-    fisherlib = job['cls'](job_dir(name), **kwargs)
+    kwargs = dict(JOBS[name]['kwargs'], hd_data_version=hd_data_version)
+    fisherlib = hdinitPkfisher.Fisher(job_dir(name), **kwargs)
     fisherlib.calculate_fisher_derivs()
     mpi.comm.barrier()
 
@@ -372,12 +347,11 @@ def run_job(name):
 # ----------------------------------------------------------------------
 def build_matrix(name, job_key, extra, get_kwargs):
     """One Fisher matrix, from derivatives already on disk."""
-    job = JOBS[job_key]
     # overwrite=False here, so that reading the derivatives back does not
     # remove them.
-    kwargs = dict(job['kwargs'], overwrite=False,
+    kwargs = dict(JOBS[job_key]['kwargs'], overwrite=False,
                   hd_data_version=hd_data_version, **extra)
-    fisherlib = job['cls'](job_dir(job_key), **kwargs)
+    fisherlib = hdinitPkfisher.Fisher(job_dir(job_key), **kwargs)
     return fisherlib.get_fisher(use_H0=use_H0, save=False, **get_kwargs)
 
 
@@ -392,7 +366,15 @@ def reference_errors(name):
 
 def build_matrices():
     """Build the matrices, save them, and print the largest fractional
-    difference between each one's errors and the shipped matrix."""
+    difference between each one's errors and the shipped matrix.
+
+    Every rank builds the matrices, because setting up a `Fisher` has MPI
+    barriers in it and a rank left waiting at one would hang the job. Only
+    rank 0 saves and prints."""
+    if mpi.rank != 0:
+        for name, job_key, extra, get_kwargs in ACTIVE_MATRICES:
+            build_matrix(name, job_key, extra, get_kwargs)
+        return
     os.makedirs(MATRIX_OUT_DIR, exist_ok=True)
     print(f'\n=== {len(ACTIVE_MATRICES)} Fisher matrices -> {MATRIX_OUT_DIR}',
           flush=True)
@@ -417,7 +399,7 @@ def build_matrices():
 # ----------------------------------------------------------------------
 # Agreement at 1e-6 or better means the derivatives reproduce the shipped
 # matrix exactly. Differences below a percent are what recomputing with a
-# different CAMB or CLASS build gives. 
+# different CAMB or CLASS build gives.
 
 if __name__ == '__main__':
     if CALCULATE_DERIVS:
@@ -425,6 +407,5 @@ if __name__ == '__main__':
             run_job(job_name)
         mpi.comm.barrier()
 
-    # Assembling the matrices is serial, so one rank does it.
-    if BUILD_MATRICES and mpi.rank == 0:
+    if BUILD_MATRICES:
         build_matrices()

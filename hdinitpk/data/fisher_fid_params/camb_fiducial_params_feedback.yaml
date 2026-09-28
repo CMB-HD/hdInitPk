@@ -1,0 +1,38 @@
+# cosmological parameters from Planck 2018 TT,TE,EE + low l + low E + lensing
+ombh2: 0.02237
+omch2: 0.1200
+theta: 1.04071
+tau: 0.0544
+logA: 3.044
+ns: 0.9649
+H0: 67.36
+nnu: 3.044
+mnu: 0.06
+nrun: 0.0
+num_massive_neutrinos: 3
+
+#ksz
+A_ksz: 1.0
+n_ksz: 0.0
+
+#tagn
+halofit_version: 'mead2020_feedback'
+# BBN table and recombination model. These are the CAMB 1.5.9 defaults,
+# written out to match the CAMB settings in hdMockData.
+bbn_predictor: 'PRIMAT_Yp_DH_ErrorMC_2021.dat'
+recombination_model: 'Recfast'
+HMCode_logT_AGN: 7.8
+
+# accuracy parameters:
+NonLinear: NonLinear_both
+AccuracyBoost: 1.1
+kmax: 100
+k_per_logint: 130
+min_l_logl_sampling: 10000
+lAccuracyBoost: 3.0
+lSampleBoost: 3.0
+DoLateRadTruncation: False
+lens_margin: 2050
+lens_potential_accuracy: 30
+# The maximum multipole is not set here. The theory is calculated to the
+# lmax of the CMB-HD mock data in hdMockData (24,000 for v1.2).

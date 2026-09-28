@@ -7,6 +7,9 @@ omch2:
 tau: 
         step_size: 0.05
         step_type: relative
+theta: 
+        step_size: 0.01
+        step_type: relative
 H0: 
         step_size: 0.01
         step_type: relative

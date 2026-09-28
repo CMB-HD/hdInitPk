@@ -1,0 +1,91 @@
+# ----- cosmological parameters -----
+# From Planck 2018 TT,TE,EE + lowl + lowE + lensing, matching the CAMB file.
+omega_b: 0.02237          # was ombh2
+omega_cdm: 0.1200         # was omch2
+theta_s_100: 1.041697     # 100 theta_s from CLASS for H0 = 67.36 (hdMockData v1.2)
+tau_reio: 0.0544          # was tau
+n_s: 0.9649               # was ns
+alpha_s: 0.0              # was nrun
+
+ln_A_s_1e10: 3.044
+# A_s: 2.0989031673191437e-09   # alternative to ln_A_s_1e10; see note above
+
+# Only used when `use_H0=True`; otherwise dropped in favour of theta_s_100.
+H0: 67.36
+
+
+# ----- neutrinos -----
+#
+# Three massive neutrinos of 0.02 eV each, and N_ur = 0.00441 massless ones,
+# for N_eff = 3.044, as in the CLASS settings of hdMockData. hdfisher reads
+# the total mass off `m_ncdm` as `sum_m_ncdm` (the same quantity as CAMB's
+# `mnu`), so that the step-size file can vary the total mass; it then splits
+# the new total evenly over the three species when it calls CLASS. There is
+# no such alias for N_eff: the step-size file varies `N_ur` directly.
+N_ncdm: 3
+deg_ncdm: 1,1,1
+m_ncdm: 0.02,0.02,0.02
+N_ur: 0.004410200000000142
+
+
+
+# The maximum multipole is not set here. The theory is calculated to the
+# lmax of the CMB-HD mock data in hdMockData (24,000 for v1.2).
+
+
+# ----- non-linear model -----
+hmcode_version: 2020_baryonic_feedback
+log10T_heat_hmcode: 7.8
+
+# ----- kSZ template -----
+# The amplitude and tilt of the kSZ template that hdinitpk adds to TT when
+# ksz=True. These are not CLASS parameters; hdinitpk takes them out before
+# the rest is passed to CLASS.
+A_ksz: 1.0
+n_ksz: 0.0
+
+
+
+# ----- output and physics settings -----
+output: 'lCl ,tCl ,pCl ,mPk'
+modes: 's'
+lensing: 'yes'
+non_linear: 'hmcode'
+recombination: 'recfast'
+YHe: 'BBN'
+T_cmb: 2.7255
+
+# The BBN table is the PRIMAT 2021 table provided with hdMockData. The
+# path is relative to the CLASS directory, as in hdMockData, so the file
+# has to be copied to the `external/bbn` directory of CLASS (see the README).
+sBBN file: /external/bbn/PRIMAT_Yp_DH_ErrorMC_2021_CLASS.dat
+
+
+# ----- accuracy settings -----
+delta_l_max: 2050
+P_k_max_h/Mpc: 500.0
+l_logstep: 1.025
+l_linstep: 20
+perturbations_sampling_stepsize: 0.05
+l_switch_limber: 30.0
+hyper_sampling_flat: 32.0
+l_max_g: 40
+l_max_ur: 35
+l_max_pol_g: 60
+ur_fluid_approximation: 2
+ur_fluid_trigger_tau_over_tau_k: 130.0
+radiation_streaming_approximation: 2
+radiation_streaming_trigger_tau_over_tau_k: 240.0
+hyper_flat_approximation_nu: 7000.0
+transfer_neglect_delta_k_S_t0: 0.17
+transfer_neglect_delta_k_S_t1: 0.05
+transfer_neglect_delta_k_S_t2: 0.17
+transfer_neglect_delta_k_S_e: 0.17
+accurate_lensing: 1
+start_small_k_at_tau_c_over_tau_h: 0.0004
+start_large_k_at_tau_h_over_tau_k: 0.05
+tight_coupling_trigger_tau_c_over_tau_h: 0.005
+tight_coupling_trigger_tau_c_over_tau_k: 0.008
+start_sources_at_tau_c_over_tau_h: 0.006
+l_max_ncdm: 30
+tol_ncdm_synchronous: 1.0e-6
