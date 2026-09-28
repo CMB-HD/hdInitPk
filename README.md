@@ -2,12 +2,21 @@
 
 This repository contains the code used in the analysis and forecasts of [Cheslog, Finson, MacInnis, Sehgal, Afshordi, Nerval, and Hložek (2026)](https://arxiv.org/abs/XXXX.XXXXX). Please cite that work if you use this software or the associated data.
 
-The code we provide here can be used to forecast constraints on the primordial scalar power spectrum $\mathcal{P}(k)$ from future CMB and BAO data, with the theory calculated by either CAMB or CLASS. $\mathcal{P}(k)$ can be modeled either as a power law, with an amplitude $A_\mathrm{s}$, spectral index $n_\mathrm{s}$, and running $\alpha_\mathrm{s}$, or as a general binned function of wavenumber. It extends the Fisher code [hdfisher](https://github.com/CMB-HD/hdfisher), which provides the CMB-HD-like and SO-like survey configurations, and can also marginalize over baryonic feedback and a kSZ power spectrum template. We also provide methods to:
+The code and additional files provided here can be used to obtain cosmological parameter constraints from current CMB and BAO data by running MCMC chains, and to obtain projected constraints from mock CMB and BAO data with Fisher forecasts. In particular, we provide [Cobaya](https://cobaya.readthedocs.io) input YAML files that use *Planck*, ACT, SPT, and DESI data and associated likelihoods, and we provide code that can be used to calculate Fisher matrices with mock CMB-HD, SO, and DESI data. These current and projected parameter constraints can be obtained by using either CAMB or CLASS for the theory calculations.
 
-- Calculate the lensed, unlensed, and delensed CMB and CMB lensing power spectra for a binned $\mathcal{P}(k)$.
-- Constrain a binned $\mathcal{P}(k)$ with any choice of bins from current data, using the Cobaya theory class `BinnedPk` together with any CMB and BAO likelihoods available to Cobaya.
+We provide two ways to model the primordial scalar power spectrum $\mathcal{P}(k)$, along with methods to constrain the parameters of each model using current or future data:
+1. As a power law with amplitude $A_\mathrm{s}$, spectral index $n_\mathrm{s}$, and a running of the spectral index $\alpha_\mathrm{s} \equiv d n_\mathrm{s}/d \mathrm{ln}k$ (this is the default in CAMB and CLASS), or
+2. As a general binned function of wavenumber $k$ for any choice of binning; in this case, the parameters $A_\mathrm{s}$, $n_\mathrm{s}$, $\alpha_\mathrm{s}$ are replaced by the amplitudes $\{\mathcal{P}(k_i)\}$ at the bin centers $\{k_i\}$. (This feature is only available for CAMB).
+
+We also provide methods to:
+- Calculate lensed CMB power spectra and the CMB lensing power spectrum for a given set of cosmological parameters using either CAMB or CLASS; by default, we use accuracy settings that produce agreement between the two codes to within 0.5%
+- Calculate lensed and delensed CMB power spectra, along with the CMB lensing power spectrum, from CAMB, using either a power law or a general binned $\mathcal{P}(k)$
+- Constrain a binned $\mathcal{P}(k)$ for any choice of binning:
+  - By running MCMC chains using a modified version of the Cobaya theory class `BinnedPk` (provided here), along with any (current or future) CMB and BAO data and likelihoods available to Cobaya
+  - By calculating a Fisher matrix where the amplitudes of the $\mathcal{P}(k)$ bins are treated as varied parameters
 - Convert constraints on the primordial $\mathcal{P}(k)$ into constraints on the linear matter power spectrum today, $P_\mathrm{lin}(k, z=0)$, from either Fisher forecasts or MCMC chains.
-- Calculate how much the CAMB and CLASS accuracy settings bias the forecasted parameters.
+- Marginalize over baryonic feedback effects and, for Fisher forecasts, a kSZ power spectrum template parameterized by its amplitude and slope
+- Calculate the expected bias on inferred parameter values due to insufficient CAMB or CLASS accuracy settings
 - Generate the figures and tables of Cheslog et al. (2026).
 
 We also provide the Cobaya input files, the thinned MCMC chains, and the Fisher matrices used in Cheslog et al. (2026), along with notebooks and scripts that reproduce its results; see [What is in this repository](#what-is-in-this-repository).
