@@ -1,6 +1,6 @@
 # hdInitPk
 
-This repository contains the code used in the analysis and forecasts of [Cheslog, Finson, MacInnis, Sehgal, Afshordi, Nerval, and Hložek (2026)](https://arxiv.org/abs/XXXX.XXXXX). Please cite that work if you use this software or the associated data.
+This repository contains the code used in the analysis and forecasts of [Cheslog, Finson, MacInnis, Sehgal, Afshordi, Nerval, and Hložek (2026)](https://arxiv.org/abs/2609.35964). Please cite that work if you use this software or the associated data.
 
 The code and additional files provided here can be used to obtain cosmological parameter constraints from current CMB and BAO data by running MCMC chains, and to obtain projected constraints from mock CMB and BAO data with Fisher forecasts. In particular, we provide [Cobaya](https://cobaya.readthedocs.io) input YAML files that use *Planck*, ACT, SPT, and DESI data and associated likelihoods, and we provide code that can be used to calculate Fisher matrices with mock CMB-HD, SO, and DESI data. These current and projected parameter constraints can be obtained by using either CAMB or CLASS for the theory calculations.
 
